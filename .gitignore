@@ -1,7 +1,61 @@
-wandb/
+# Python cache & compiled files
 __pycache__/
-*.pt
-*.npy
-*.tif
+*.py[cod]
+*.so
+*.pyd
+*.pyo
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode, PyCharm, other IDE folders
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+*.env
+*.yml.lock
+*.egg-info/
+*.log
+
+# WandB logs
+wandb/
+wandb-debug.log
+
+# Model checkpoints & output predictions
 outputs/
+*.pt
+*.ckpt
+*.pth
+*.onnx
+
+# Large experiment folders
+experiments/
+
+# Raw and processed data folders
 data/raw/
+data/processed/
+data/meta/
+
+# Temporary or intermediate data
+*.npy
+*.npz
+*.tif
+*.csv
+*.pkl
+*.tmp
+
+# Test outputs or artifacts
+tests/__pycache__/
+tests/*.out
+
+# Avoid committing system-wide slurm or cache dumps
+slurm-*.out
+*.bak
+*.swp
