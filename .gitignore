@@ -1,0 +1,7 @@
+wandb/
+__pycache__/
+*.pt
+*.npy
+*.tif
+outputs/
+data/raw/

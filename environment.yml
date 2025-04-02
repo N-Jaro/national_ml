@@ -1,0 +1,20 @@
+name: national-ml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - torchaudio
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - rasterio
+  - wandb
+  - jupyterlab
+  - tqdm
+  - pip
+  - pip:
+      - segmentation-models-pytorch
