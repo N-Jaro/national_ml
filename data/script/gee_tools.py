@@ -1,0 +1,261 @@
+import ee
+import re
+import os
+import config as const
+import time
+from drive_manager import GoogleDriveManager
+from config import Settings
+
+
+class GEEWorkflow:
+    
+    def __init__(self,settings:Settings ,drive_manager: GoogleDriveManager):
+        
+        self.settings = settings
+        self.all_tasks = []
+        self.drive_manager = drive_manager
+        self._authenticate()
+        self._data_collection()
+        
+        self.base_file_name = []  # save base file name for each HUC export
+        
+        
+    def _authenticate(self):
+        try:
+            ee.Initialize()
+            print("Google Earth Engine successfully initialized.")
+        except ee.EEException as e:
+            print(e)
+            print("GEE failed initialized. Pleas run 'earthengine authenticate'.")
+            exit()
+        
+    def _data_collection(self):
+        """Load necessary data collections"""
+        self.HUC8_COL = ee.FeatureCollection(self.settings.HUC8_COL_NAME)
+        self.MERIT_HYDRO_IMG = ee.Image(self.settings.MERIT_HYDRO_IMG_NAME)
+        self.DEM_SOURCE_IMG = ee.Image(self.settings.DEM_SOURCE_IMG_NAME)
+    
+    def launch_all_export_tasks(self):
+        """Launch all export tasks for selected HUCs"""
+        """Test function to randomly select HUCs and export their data"""
+
+        selected_hucs = self.HUC8_COL.randomColumn('random').sort('random').limit(self.settings.NUMBER_OF_HUCS)
+        
+        # 1. export original HUC boundaries to Google Drive
+        desc_global = f'ALL_HUC8_Original_Boundaries_Export_{self.settings.NUMBER_OF_HUCS}'
+        task_global = ee.batch.Export.table.toDrive(
+            collection=selected_hucs,
+            description=desc_global,
+            folder=self.settings.DRIVE_FOLDER,
+            fileNamePrefix=f'Selected_{self.settings.NUMBER_OF_HUCS}_HUC8_Original_Boundaries',
+            fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_global, 'description': desc_global})
+
+        # 2. get the selected HUCs information
+        selected_hucs_list_info = selected_hucs.select(['huc8', 'states', 'name']).toList(self.settings.NUMBER_OF_HUCS).getInfo()
+        print(f"Obtain {len(selected_hucs_list_info)} information of one HUC. Start creating export tasks for each HUC...")
+
+        # 3. add tasks for each selected HUC
+        for feature_info in selected_hucs_list_info:
+            self.base_file_name.append(self.launch_single_set_of_tasks(feature_info))
+            
+        # 4. launch the global HUC boundary export task
+        print(f"\n--- {len(self.all_tasks)}tasks have been created, started... ---")
+        for item in self.all_tasks:
+            item['task'].start()
+            print(f"Initiated task: {item['description']} (ID: {item['task'].id})")
+
+    
+    
+    def _monitor_and_organize_tasks(self):
+        """Monitor the status of all launched tasks and organize them in Google Drive"""
+        print("\n---Monitor Mode ---")
+    
+        while True:
+            active_tasks = []
+            all_done = True
+            for item in self.all_tasks:
+                # only check tasks that are not already completed or failed
+                if item.get('state') != 'COMPLETED' and item.get('state') != 'FAILED':
+                    try:
+                        status = item['task'].status()
+                        current_state = status['state']
+                        item['state'] = current_state # update state in the item
+
+                        if current_state in ['RUNNING', 'READY']:
+                            active_tasks.append(item['description'])
+                            all_done = False 
+                        elif current_state == 'FAILED':
+                            print(f"!!! Task Failure: {item['description']} !!!")
+                            print(f"    Erro message: {status.get('error_message', 'Unknown error')}")
+
+                    except ee.ee_exception.EEException as e:
+                        # catch GEE-specific errors
+                        error_str = str(e)
+                        if '503' in error_str or 'unavailable' in error_str:
+                            # if it's a temporary server error, we can retry later
+                            print(f"Warning: Temory server error(503) occur when checking task'{item['description']}' status. Retrying later...")
+                            active_tasks.append(item['description']) # keep it in the active list
+                            all_done = False
+                        else:
+                            # for other errors, we mark the task as failed
+                            print(f"!!! Task Failed (Unknow GEE error): {item['description']} !!!")
+                            print(f"Error Message: {e}")
+                            item['state'] = 'FAILED'
+            
+            if all_done:
+                print("ALL GEE FINISHED!")
+                break
+            
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ongoing task: ({len(active_tasks)}/{len(self.all_tasks)}): {', '.join(active_tasks[:3])}...")
+            time.sleep(60) # check every 60 seconds
+        
+        # Because all tasks are parallel, multiple folders with the same name will appear in google drive and need to be merged.
+        print("\n--- Merging Google Drive folders ---")
+        for name in self.base_file_name:
+            print(f"Merging folders: {name}")
+            self.drive_manager.merge_duplicate_folders(name)
+            # move all files to the main folder
+            self.drive_manager.move_folder(name, self.settings.DRIVE_FOLDER)
+            
+        print("\n--- Download files from Google Drive ---")
+        if not os.path.exists(self.settings.LOCAL_DOWNLOAD_DIR):
+            os.makedirs(self.settings.LOCAL_DOWNLOAD_DIR)
+
+        # get the main folder ID
+        main_folder_id = self.drive_manager.get_gdrive_folder_id(self.settings.DRIVE_FOLDER)
+        if not main_folder_id:
+            print(f"Error：Can not found main folder in Google Drive '{self.settings.DRIVE_FOLDER}'")
+            return
+
+        self.drive_manager.download_folder_recursively(main_folder_id, self.settings.LOCAL_DOWNLOAD_DIR)
+        
+
+        return
+        
+    
+    def launch_single_set_of_tasks(self, feature_info):
+        props = feature_info['properties']
+        huc_id = props.get('huc8', 'UnknownID')
+        name = props.get('name', 'UnknownName')
+        states = props.get('states', 'NA')
+        
+        original_geometry = ee.Geometry(feature_info['geometry'])
+        
+        # clean up name for file naming
+        clean_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', name)
+        base_filename = f'HUC8_{huc_id}_{clean_name}'
+
+        buffered_geometry = original_geometry.buffer(self.settings.BUFFER_DISTANCE_METERS)
+        export_region_rectangle = buffered_geometry.bounds()
+
+        print(f"\n Creat({name}) for HUC {huc_id}，export to {base_filename}")
+
+        # Task 1: buffered boundary (vector)
+        buffered_fc = ee.FeatureCollection([ee.Feature(buffered_geometry, props)])
+        desc_buff = f'Buffered_Boundary_{huc_id}'
+        task_buff = ee.batch.Export.table.toDrive(
+            collection=buffered_fc, description=desc_buff, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_Buffered_Boundary', fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_buff, 'description': desc_buff, 'folder': base_filename})
+
+        # Task 2: region rectangle (vector)
+        bbox_fc = ee.FeatureCollection([ee.Feature(export_region_rectangle, props)])
+        desc_bbox = f'BoundingBox_{huc_id}'
+        task_bbox = ee.batch.Export.table.toDrive(
+            collection=bbox_fc, description=desc_bbox, folder= base_filename,
+            fileNamePrefix=f'{base_filename}_BoundingBox', fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_bbox, 'description': desc_bbox, 'folder': base_filename})
+        
+        # Task 3: DEM
+        dem_image = self._get_dem(self.DEM_SOURCE_IMG,export_region_rectangle)
+        desc_dem = f'DEM_3DEP_Export_{huc_id}'
+        task_dem = ee.batch.Export.image.toDrive(
+            image=dem_image.toFloat(), description=desc_dem, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_DEM_10m_Rect', region=export_region_rectangle,
+            scale=10, crs=self.settings.TARGET_DEM_CRS, maxPixels=1.5e10
+        )
+        self.all_tasks.append({'task': task_dem, 'description': desc_dem, 'folder': base_filename})
+
+        # Task 4 & 5: optical and thermal Landsat images
+        landsat_images = self._get_landsat_images(buffered_geometry, self.settings.START_DATE, self.settings.END_DATE)
+        desc_l_opt = f'Landsat_Optical_Export_{huc_id}'
+        task_l_opt = ee.batch.Export.image.toDrive(
+            image=landsat_images['optical'].toFloat(), description=desc_l_opt, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_Landsat_Optical_Rect', region=export_region_rectangle,
+            scale=30, crs='EPSG:4326', maxPixels=1.5e10
+        )
+        self.all_tasks.append({'task': task_l_opt, 'description': desc_l_opt, 'folder': base_filename})
+        
+        desc_l_therm = f'Landsat_Thermal_Export_{huc_id}'
+        task_l_therm = ee.batch.Export.image.toDrive(
+            image=landsat_images['thermal'].toFloat(), description=desc_l_therm, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_Landsat_Thermal_Rect', region=export_region_rectangle,
+            scale=30, crs='EPSG:4326', maxPixels=1.5e10
+        )
+        self.all_tasks.append({'task': task_l_therm, 'description': desc_l_therm, 'folder': base_filename})
+        
+        # Task 6: SAR image
+        sar_image = self._get_sar_image(buffered_geometry, self.settings.START_DATE, self.settings.END_DATE)
+        desc_sar = f'SAR_VV_Export_{huc_id}'
+        task_sar = ee.batch.Export.image.toDrive(
+            image=sar_image.toFloat(), description=desc_sar, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_SAR_VV_Rect', region=export_region_rectangle,
+            scale=10, crs='EPSG:4326', maxPixels=1.5e10
+        )
+        self.all_tasks.append({'task': task_sar, 'description': desc_sar, 'folder': base_filename})
+
+        # Task 7: MERIT Hydro Flow Direction
+        flow_dir_resampled = self.MERIT_HYDRO_IMG.select('dir').reproject(crs=self.settings.TARGET_DEM_CRS, scale=10)
+        flow_dir_final = flow_dir_resampled.clip(export_region_rectangle)
+        desc_flow = f'FlowDir_10m_Export_{huc_id}'
+        task_flow = ee.batch.Export.image.toDrive(
+            image=flow_dir_final.toUint8(), description=desc_flow, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_FlowDir_10m_Rect', region=export_region_rectangle,
+            scale=10, crs=self.settings.TARGET_DEM_CRS, maxPixels=1.5e10
+        )
+        self.all_tasks.append({'task': task_flow, 'description': desc_flow, 'folder': base_filename})
+        return base_filename
+
+    
+    
+    def _mask_l8sr_clouds(self, image):
+        """Landsat 8/9 SR Image cloud removal function """
+        cloud_shadow_bit_mask = 1 << 4
+        clouds_bit_mask = 1 << 3
+        qa = image.select('QA_PIXEL')
+        mask = qa.bitwiseAnd(cloud_shadow_bit_mask).eq(0).And(qa.bitwiseAnd(clouds_bit_mask).eq(0))
+        
+        optical_bands = image.select('SR_B[2-7]').multiply(0.0000275).add(-0.2)
+        thermal_band = image.select('ST_B10').multiply(0.00341802).add(149.0)
+        
+        return image.addBands(optical_bands, None, True).addBands(thermal_band, None, True).updateMask(mask)
+
+    def _get_dem(self,source_img,clip_geometry):
+        return source_img.select('elevation').clip(clip_geometry)
+
+    def _get_landsat_images(self, filter_geometry, start_date, end_date):
+        landsat_col = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2') \
+            .merge(ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')) \
+            .filterBounds(filter_geometry) \
+            .filterDate(start_date, end_date) \
+            .map(self._mask_l8sr_clouds)
+        
+        landsat_optical_median = landsat_col.select(['SR_B4', 'SR_B3', 'SR_B2']).median()
+        landsat_thermal_median = landsat_col.select('ST_B10').median()
+        return {'optical': landsat_optical_median, 'thermal': landsat_thermal_median}
+
+    def _get_sar_image(self, filter_geometry, start_date, end_date):
+        sentinel1_col = ee.ImageCollection('COPERNICUS/S1_GRD') \
+            .filterBounds(filter_geometry) \
+            .filterDate(start_date, end_date) \
+            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')) \
+            .filter(ee.Filter.eq('instrumentMode', 'IW')).select('VV')
+        return sentinel1_col.median()
+
+
+
+
