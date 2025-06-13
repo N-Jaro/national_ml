@@ -22,7 +22,7 @@ class GEEWorkflow:
         
     def _authenticate(self):
         try:
-            ee.Initialize()
+            ee.Initialize(project=self.settings.GEE_PROJECT_ID)
             print("Google Earth Engine successfully initialized.")
         except ee.EEException as e:
             print(e)

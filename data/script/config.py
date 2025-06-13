@@ -9,6 +9,8 @@ class Settings:
         self.LOCAL_DOWNLOAD_DIR = 'gee_downloads' # download directory for GEE exports
         self.EXPORT_VECTOR_FORMAT = 'GeoJSON'  # export vector format, can be 'GeoJSON' or 'KML'
         self.TARGET_DEM_CRS = 'EPSG:4269'  # target CRS for DEM exports
+        self.GDRIVE_CREDENTIALS_FILE = 'credentials.json' # Google Drive API credentials file
+        self.GEE_PROJECT_ID = 'nathanj-national-ml'  # GEE project ID for exports
 
 
         # data 

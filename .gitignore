@@ -59,3 +59,8 @@ tests/*.out
 slurm-*.out
 *.bak
 *.swp
+*client_secret_*.json
+*credentials.json
+*.geojson
+*.json
+

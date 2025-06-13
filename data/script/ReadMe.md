@@ -23,6 +23,13 @@ For test, we randomly select HUC.
 ## Before use
 ### Prepare your python enviroment
 
+Install Google Cloud CLI
+
+``` bash
+# get the package 
+curl https://sdk.cloud.google.com | bash
+```
+
 Install earthengine-api:
 
 ``` bash
@@ -30,7 +37,7 @@ Install earthengine-api:
 pip install earthengine-api
 
 # access Google Drive API
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlibconda in
 ```
 
 ### Authenticate GEE and Google Drive respectively.
@@ -62,6 +69,9 @@ This is to give your Python script the permission to access your Google Drive.
 
 
  After creation, you will see a client ID and a key. Click the `Download JSON File` button on the right, download this file, rename it `credentials.json`, and then place it in the folder where your Python script is located.
+ 
+ Do not forget to publish the app
+ ![alt text](image.png)
 
  ## TODO
 1. Check the result.
