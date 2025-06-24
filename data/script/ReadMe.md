@@ -1,7 +1,12 @@
 # Data Processing
-*Update: Jun 12/ 2025 by Dingqi*
+*Update: Jun 24/ 2025 by Dingqi*
 
-This is a script used for auto data collection.
+> Check gee_tools.py ->launch_single_data_collector function before run it!
+
+
+> **Test Mode: Only get one batch & one patch for test. To modify-> see gee_tools.py line 310, line 340**
+
+This is a script used for auto data collection/ patches collection
 
 * Create independent subfolders for each HUC in Google Drive.
 * buffer the HUC boundary.
@@ -19,6 +24,8 @@ Export seven types of data:
 These data will be downloaded to `gee_downloads` folder as default.
 
 For test, we randomly select HUC.
+
+
 
 ## Before use
 ### Prepare your python enviroment
@@ -71,12 +78,48 @@ This is to give your Python script the permission to access your Google Drive.
  After creation, you will see a client ID and a key. Click the `Download JSON File` button on the right, download this file, rename it `credentials.json`, and then place it in the folder where your Python script is located.
  
  Do not forget to publish the app
- ![alt text](image.png)
-
- ## TODO
-1. Check the result.
+ ![alt text](imgs/image.png)
 
 
+## To get the unlimited Google Drive
+> By sharing the Google Cloud Platform (GCP) with the Illinois account, you can gain access to GEE while using an unlimited cloud storage.
+
+1. share your project with illinois account:
+
+![step1](imgs/step1.jpg)
+
+![step2](imgs/step2.jpg)
+
+2. create a folder in your illinois account and share it to your own google account
+
+![step3](imgs/step3.jpg)
+
+##  New Features/ Notes
+
+1. Move original HUC boundaries to HUC folder
+
+2. Create tools set for visualization patch center and patch size. setting in config.py VISUALIZE_POINTS. 
+
+
+3. Get patches and auto downloads(Highly recommend to run only a portion of the code during testing (comment out the rest in gee_tools), as running the full workflow can be time-consuming.)
+
+4. Manage your task though: https://code.earthengine.google.com/tasks
+
+5. Dont do getInfo() for the whole FeatureCollection, it will take long long time.
+
+6. All image will be reprojected to DEM projection('EPSG:4269'). All projection will be printed. Make sure they are same.
+
+---
+* Todo: Use map() than `for` loop to speed up
+
+
+
+
+## Additional Resources
+
+For the record, I created a Google Drive folder for backup purposes. You can access it using the following link:
+
+[Google Drive Folder](https://drive.google.com/drive/folders/13b4g6TtqcbOZp2pKSxqs71IV1oRF6NAq?usp=sharing) 
 
 
 

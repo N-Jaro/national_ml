@@ -32,7 +32,7 @@ class GoogleDriveManager:
         
         try:
             service = build('drive', 'v3', credentials=creds)
-            print("Google Drive API successfully initialized。")
+            print("Google Drive API successfully initialized.")
             return service
         except HttpError as error:
             print(f'Error occur when launched Google Drive service: {error}')
@@ -216,3 +216,4 @@ class GoogleDriveManager:
                         print(f"  Download progress: {int(status.progress() * 100)}%")
                 print(f"  Download finished: {item_name}")
         
+    
