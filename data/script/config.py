@@ -12,11 +12,19 @@ class Settings:
         self.GDRIVE_CREDENTIALS_FILE = 'credentials.json' # Google Drive API credentials file
         self.GEE_PROJECT_ID = 'nathanj-national-ml'  # GEE project ID for exports
 
-
         # data 
         self.HUC8_COL_NAME = 'USGS/WBD/2017/HUC08' #ee.FeatureCollection('USGS/WBD/2017/HUC08')
         self.MERIT_HYDRO_IMG_NAME = 'MERIT/Hydro/v1_0_1' #ee.Image('MERIT/Hydro/v1_0_1')
         self.DEM_SOURCE_IMG_NAME ='USGS/3DEP/10m'
+        
+        # patches
+        self.PATCH = True
+        self.PATCH_SIZE = 224
+        self.PATCH_STRIDE =224
+        self.BATCH_EXPORT_SIZE = 500
+        
+        self.VISUALIZE_POINTS = True  # whether to visualize points on the map
+        
 
         # Google Drive API
         self.SCOPES = ['https://www.googleapis.com/auth/drive']

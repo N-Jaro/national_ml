@@ -13,8 +13,8 @@ if __name__ == '__main__':
     if drive.service:
         
         print("\n--- Start the GEE export task ---")
-        #
+        
         gee.launch_all_export_tasks()
-        gee._monitor_and_organize_tasks()
+        gee.monitor_and_organize_tasks()
 
         print("\n--- Finished ---")

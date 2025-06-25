@@ -25,14 +25,25 @@ class GoogleDriveManager:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(self.settings.GDRIVE_CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.settings.GDRIVE_CREDENTIALS_FILE,
+                    scopes=SCOPES,
+                    redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+                )
+                auth_url, _ = flow.authorization_url(prompt='consent')
+                print('Please go to this URL and authorize the application:')
+                print(auth_url)
+                code = input('Enter the authorization code: ')
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+
+                # Save the token for future use
+                with open('token.json', 'w') as token_file:
+                    token_file.write(creds.to_json())
         
         try:
             service = build('drive', 'v3', credentials=creds)
-            print("Google Drive API successfully initialized。")
+            print("Google Drive API successfully initialized.")
             return service
         except HttpError as error:
             print(f'Error occur when launched Google Drive service: {error}')
@@ -216,3 +227,4 @@ class GoogleDriveManager:
                         print(f"  Download progress: {int(status.progress() * 100)}%")
                 print(f"  Download finished: {item_name}")
         
+    
