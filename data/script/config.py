@@ -10,8 +10,7 @@ class Settings:
         self.EXPORT_VECTOR_FORMAT = 'GeoJSON'  # export vector format, can be 'GeoJSON' or 'KML'
         self.TARGET_DEM_CRS = 'EPSG:4269'  # target CRS for DEM exports
         self.GDRIVE_CREDENTIALS_FILE = 'credentials.json' # Google Drive API credentials file
-        self.GEE_PROJECT_ID = None #'nathanj-national-ml'  # GEE project ID for exports
-
+        self.GEE_PROJECT_ID = 'nathanj-national-ml'  # GEE project ID for exports
 
         # data 
         self.HUC8_COL_NAME = 'USGS/WBD/2017/HUC08' #ee.FeatureCollection('USGS/WBD/2017/HUC08')
