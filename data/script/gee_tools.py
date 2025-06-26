@@ -480,10 +480,6 @@ class GEEWorkflow:
         )
 
         return patch_centers.select([])
-
-
-    # def _filter_patch_centers(self,centers:ee.FeatureCollection, bounder:ee.Geometry):
-    #     return centers.filterBounds(bounder)
         
     def _extract_patches_gee(self,source_image: ee.Image, center_points: ee.FeatureCollection, patch_size: int) -> ee.ImageCollection:
         """
@@ -517,8 +513,6 @@ class GEEWorkflow:
 
         patches = center_points.map(create_patch)
         return ee.ImageCollection(patches)
-
- 
         
     def _mask_l8sr_clouds(self, image):
         """Landsat 8/9 SR Image cloud removal function """
@@ -554,6 +548,172 @@ class GEEWorkflow:
             .filter(ee.Filter.eq('instrumentMode', 'IW')).select('VV')
         return sentinel1_col.median()
 
+    # Delete the old launch_single_data_collector function and replace it with this:
 
+    def process_single_huc(self, feature_info: dict):
+        """
+        Main orchestrator for processing a single HUC.
+        It separates the workflow into boundary and raster processing.
 
+        Args:
+            feature_info: The dictionary containing properties and geometry for one HUC.
+        """
+        # --- 1. Initial Setup ---
+        props = feature_info['properties']
+        huc_id = props.get('huc8', 'UnknownID')
+        name = props.get('name', 'UnknownName')
+        
+        # Create a clean base filename for this HUC
+        clean_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', name)
+        base_filename = f'HUC8_{huc_id}_{clean_name}'
+        self.current_file = base_filename
+        self.base_file_name.append(base_filename)
+        
+        original_geometry = ee.Geometry(feature_info['geometry'])
+        
+        # --- 2. Process and Export Vector Boundaries ---
+        # This function returns the geometries needed for the next step.
+        geometries = self._process_vector_boundaries(original_geometry, ee.Dictionary(props), base_filename)
+        
+        # --- 3. Process and Export Raster Data and Patches ---
+        self._process_raster_data(geometries, base_filename)
+        
+    def _process_vector_boundaries(self, original_geometry: ee.Geometry, props: ee.Dictionary, base_filename: str) -> dict:
+        """
+        Processes and exports all vector boundaries for a single HUC.
 
+        Args:
+            original_geometry: The geometry of the original HUC.
+            props: The properties of the HUC feature.
+            base_filename: The base name for exported files and folders.
+
+        Returns:
+            A dictionary containing the essential geometries needed for raster processing.
+        """
+        print(f"\nProcessing vector boundaries for {base_filename}...")
+        
+        # --- Create Geometries ---
+        buffered_geometry = original_geometry.buffer(self.settings.BUFFER_DISTANCE_METERS)
+        export_region_rectangle = buffered_geometry.bounds()
+
+        # --- Queue Vector Export Tasks ---
+        huc_id = props.get('huc8')
+
+        # Task: Original HUC boundary
+        desc_orig_vec = f'HUC8_Original_Boundary_Vector_{huc_id}'
+        task_orig_vec = ee.batch.Export.table.toDrive(
+            collection=ee.FeatureCollection([ee.Feature(original_geometry, props)]),
+            description=desc_orig_vec, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_Original_Boundary', fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_orig_vec, 'description': desc_orig_vec, 'folder': base_filename})
+        
+        # Task: Buffered boundary
+        buffered_fc = ee.FeatureCollection([ee.Feature(buffered_geometry, props)])
+        desc_buff = f'Buffered_Boundary_Vector_{huc_id}'
+        task_buff = ee.batch.Export.table.toDrive(
+            collection=buffered_fc, description=desc_buff, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_Buffered_Boundary', fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_buff, 'description': desc_buff, 'folder': base_filename})
+
+        # Task: Bounding box
+        bbox_fc = ee.FeatureCollection([ee.Feature(export_region_rectangle, props)])
+        desc_bbox = f'BoundingBox_Vector_{huc_id}'
+        task_bbox = ee.batch.Export.table.toDrive(
+            collection=bbox_fc, description=desc_bbox, folder=base_filename,
+            fileNamePrefix=f'{base_filename}_BoundingBox', fileFormat=self.settings.EXPORT_VECTOR_FORMAT
+        )
+        self.all_tasks.append({'task': task_bbox, 'description': desc_bbox, 'folder': base_filename})
+        
+        # Return the geometries for the raster processing step
+        return {
+            'original': original_geometry,
+            'buffered': buffered_geometry,
+            'rectangle': export_region_rectangle
+        }
+
+    def _process_raster_data(self, geometries: dict, base_filename: str):
+        """
+        Processes all raster data: prepares full-size images, discovers resolutions,
+        and generates and exports patches.
+
+        Args:
+            geometries: A dictionary containing 'buffered' and 'rectangle' geometries.
+            base_filename: The base name for exported files and folders.
+        """
+        print(f"\nProcessing raster data and patches for {base_filename}...")
+
+        # Unpack geometries needed for raster operations
+        original_geometry = geometries['original']
+        buffered_geometry = geometries['buffered']
+        export_region_rectangle = geometries['rectangle']
+        common_crs = self.settings.TARGET_DEM_CRS
+
+        # --- Raster Data Preparation ---
+        dem_image = self._get_dem(self.DEM_SOURCE_IMG, export_region_rectangle)
+        
+        landsat_images_unproj = self._get_landsat_images(export_region_rectangle, self.settings.START_DATE, self.settings.END_DATE)
+        landsat_optical_proj = landsat_images_unproj['optical'].reproject(crs=common_crs)
+        landsat_thermal_proj = landsat_images_unproj['thermal'].reproject(crs=common_crs)
+        landsat_images = {
+            'optical': landsat_optical_proj.clip(export_region_rectangle),
+            'thermal': landsat_thermal_proj.clip(export_region_rectangle)
+        }
+        
+        sar_image_unproj = self._get_sar_image(export_region_rectangle, self.settings.START_DATE, self.settings.END_DATE)
+        sar_image_proj = sar_image_unproj.reproject(crs=common_crs)
+        sar_image = sar_image_proj.clip(export_region_rectangle)
+        
+        flow_dir_proj = self.MERIT_HYDRO_IMG.select('dir').reproject(crs=common_crs)
+        flow_dir_final = flow_dir_proj.clip(export_region_rectangle)
+
+        # --- Discover Resolutions Dynamically ---
+        print("Discovering native resolutions from source images...")
+        try:
+            source_resolutions = {
+                'dem': dem_image.projection().nominalScale().getInfo(),
+                'optical': landsat_images['optical'].projection().nominalScale().getInfo(),
+                'thermal': landsat_images['thermal'].projection().nominalScale().getInfo(),
+                'sar': sar_image.projection().nominalScale().getInfo(),
+                'flow': flow_dir_final.projection().nominalScale().getInfo()
+            }
+            print(f"Discovered Resolutions (m): {source_resolutions}")
+        except Exception as e:
+            print(f"Could not dynamically discover resolutions. Error: {e}. Falling back to settings.")
+            source_resolutions = self.settings.SOURCE_RESOLUTIONS
+
+        # --- Patch Generation ---
+        print("--- Generating Patches ---")
+        patch_centers = self._genearte_patch_centers(dem_image, self.settings.PATCH_SIZE, self.settings.PATCH_STRIDE, original_geometry)
+        print(f"Patch centers generated. Total centers: {patch_centers.size().getInfo()}")
+
+        # ... (Patch extraction and export loop) ...
+        batch_size = self.settings.BATCH_EXPORT_SIZE
+        num_batches = patch_centers.size().divide(batch_size).ceil().getInfo()
+        patch_centers_lists = patch_centers.toList(patch_centers.size())
+        
+        # Loop through batches for export
+        for i in range(1): # Using 1 batch for testing
+            print(f"Processing batch {i+1}/{num_batches}...")
+            start_index = i * batch_size
+            end_index = start_index + batch_size
+            batch_patches_centers = ee.FeatureCollection(patch_centers_lists.slice(start_index, end_index))
+
+            dem_patches = self._extract_patches_gee(dem_image, batch_patches_centers, self.settings.PATCH_SIZE).toList(batch_size)
+            opt_patches = self._extract_patches_gee(landsat_images['optical'], batch_patches_centers, self.settings.PATCH_SIZE).toList(batch_size)
+            the_patches = self._extract_patches_gee(landsat_images['thermal'], batch_patches_centers, self.settings.PATCH_SIZE).toList(batch_size)
+            sar_patches = self._extract_patches_gee(sar_image, batch_patches_centers, self.settings.PATCH_SIZE).toList(batch_size)
+            flow_patches = self._extract_patches_gee(flow_dir_final, batch_patches_centers, self.settings.PATCH_SIZE).toList(batch_size)
+
+            collection_size = ee.Number(dem_patches.size()).getInfo()
+            print(f"{collection_size} patch locations found in batch, starting export...")
+            
+            if collection_size > 0:
+                for j in range(1): # Exporting 1 patch for testing
+                    self._save_patches(ee.Image(dem_patches.get(j)), j, 'dem', source_resolutions['dem'])
+                    self._save_patches(ee.Image(opt_patches.get(j)), j, 'opt', source_resolutions['optical'])
+                    self._save_patches(ee.Image(the_patches.get(j)), j, 'the', source_resolutions['thermal'])
+                    self._save_patches(ee.Image(sar_patches.get(j)), j, 'sar', source_resolutions['sar'])
+                    self._save_patches(ee.Image(flow_patches.get(j)), j, 'flow', source_resolutions['flow'])
+                    
