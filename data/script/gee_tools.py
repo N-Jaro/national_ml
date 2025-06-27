@@ -21,8 +21,7 @@ class GEEWorkflow:
         
         self.current_file = None
         self.base_file_name = []  # save base file name for each HUC export
-        
-        
+          
     def _authenticate(self):
         try:
             if self.settings.GEE_PROJECT_ID:
@@ -41,17 +40,26 @@ class GEEWorkflow:
         self.HUC8_COL = ee.FeatureCollection(self.settings.HUC8_COL_NAME)
         self.MERIT_HYDRO_IMG = ee.Image(self.settings.MERIT_HYDRO_IMG_NAME)
         self.DEM_SOURCE_IMG = ee.Image(self.settings.DEM_SOURCE_IMG_NAME)
-    
-    def launch_all_export_tasks(self):
-        """Launch all export tasks for selected HUCs"""
-        """Test function to randomly select HUCs and export their data"""
 
+    def launch_all_export_tasks(self):
+        """
+        Launch all export tasks for selected HUCs. This version sanitizes all
+        collections before they are exported to prevent validation errors.
+        """
+        print("\n--- Start the GEE export task ---")
         selected_hucs = self.HUC8_COL.randomColumn('random').sort('random').limit(self.settings.NUMBER_OF_HUCS)
+
+        # --- THE FIX: Sanitize the collection before exporting ---
+        # We select only a list of known "safe" properties to include in the export.
+        # This prevents problematic characters in the 'name' field from causing an error.
+        # We must set 'retainGeometry' to True to keep the HUC boundaries.
+        properties_to_keep = ['huc8', 'states', 'areaacres', 'hu_12_ds'] # Example safe properties
+        sanitized_hucs = selected_hucs.select(propertySelectors=properties_to_keep, retainGeometry=True)
         
-        # 1. export original HUC boundaries to Google Drive
+        # 1. Export the SANITIZED collection of HUC boundaries to Google Drive
         desc_global = f'ALL_HUC8_Original_Boundaries_Export_{self.settings.NUMBER_OF_HUCS}'
         task_global = ee.batch.Export.table.toDrive(
-            collection=selected_hucs,
+            collection=sanitized_hucs, # Use the sanitized collection here
             description=desc_global,
             folder=self.settings.DRIVE_FOLDER,
             fileNamePrefix=f'Selected_{self.settings.NUMBER_OF_HUCS}_HUC8_Original_Boundaries',
@@ -59,91 +67,128 @@ class GEEWorkflow:
         )
         self.all_tasks.append({'task': task_global, 'description': desc_global})
 
+        # The rest of the function proceeds as before
         selected_hucs_list_info = selected_hucs.select(['huc8', 'states', 'name']).toList(self.settings.NUMBER_OF_HUCS).getInfo()
-        print(f"Obtain {len(selected_hucs_list_info)} information of one HUC. Start creating export tasks for each HUC...")
+        print(f"Obtain {len(selected_hucs_list_info)} information for {self.settings.NUMBER_OF_HUCS} HUC(s). Start creating export tasks for each HUC...")
 
-        # 2. add tasks for each selected HUC
+        # 2. Add tasks for each selected HUC
         for feature_info in selected_hucs_list_info:
-            self.launch_single_data_collector(feature_info,self.settings.PATCH)
+            self.process_single_huc(feature_info)
             
-        # 3. launch the global HUC boundary export task
-        print(f"\n--- {len(self.all_tasks)}tasks have been created, started... ---")
+        # 3. Launch all created tasks
+        print(f"\n--- {len(self.all_tasks)} tasks have been created, starting them now... ---")
         for item in self.all_tasks:
-            item['task'].start()
-            print(f"Initiated task: {item['description']} (ID: {item['task'].id})")
+            try:
+                item['task'].start()
+                print(f"Initiated task: {item['description']} (ID: {item['task'].id})")
+            except Exception as e:
+                print(f"!!! FAILED TO START TASK: {item['description']} !!!")
+                print(f"    Error: {e}")
 
     def monitor_and_organize_tasks(self):
-        """Monitor the status of all launched tasks and organize them in Google Drive"""
-        print("\n---Monitor Mode ---")
-    
+        """
+        Monitors the status of all launched tasks with a detailed, live-updating
+        status line and provides a comprehensive final report.
+        """
+        import itertools
+        
+        print("\n--- Monitor Mode ---")
+        start_time = time.time()
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
+
         while True:
-            active_tasks = []
-            all_done = True
+            # Dictionaries to hold the current status of all tasks
+            task_states = {'COMPLETED': 0, 'FAILED': 0, 'RUNNING': 0, 'READY': 0, 'UNSUBMITTED': 0, 'CANCELLED': 0}
+            failed_task_details = []
+            
+            active_tasks_exist = False
+
             for item in self.all_tasks:
-                # only check tasks that are not already completed or failed
-                if item.get('state') != 'COMPLETED' and item.get('state') != 'FAILED':
+                # Only poll the status if it's not in a terminal state
+                if item.get('state') not in ['COMPLETED', 'FAILED', 'CANCELLED']:
                     try:
                         status = item['task'].status()
                         current_state = status['state']
-                        item['state'] = current_state # update state in the item
+                        item['state'] = current_state  # Update state in our local list
 
                         if current_state in ['RUNNING', 'READY']:
-                            active_tasks.append(item['description'])
-                            all_done = False 
-                        elif current_state == 'FAILED':
-                            print(f"!!! Task Failure: {item['description']} !!!")
-                            print(f"    Erro message: {status.get('error_message', 'Unknown error')}")
+                            active_tasks_exist = True
+                        
+                        if current_state == 'FAILED':
+                            error_message = status.get('error_message', 'Unknown error')
+                            failed_task_details.append(f"  - {item['description']}: {error_message}")
 
-                    except ee.ee_exception.EEException as e:
-                        # catch GEE-specific errors
+                    except Exception as e:
+                        # Handle cases where the status check itself fails (e.g., network issues)
                         error_str = str(e)
                         if '503' in error_str or 'unavailable' in error_str:
-                            # if it's a temporary server error, we can retry later
-                            print(f"Warning: Temory server error(503) occur when checking task'{item['description']}' status. Retrying later...")
-                            active_tasks.append(item['description']) # keep it in the active list
-                            all_done = False
+                            # It's a temporary server error, treat the task as 'READY' and retry
+                            item['state'] = 'READY'
+                            active_tasks_exist = True
                         else:
-                            # for other errors, we mark the task as failed
-                            print(f"!!! Task Failed (Unknow GEE error): {item['description']} !!!")
-                            print(f"Error Message: {e}")
+                            # For other errors, mark as FAILED
                             item['state'] = 'FAILED'
+                            failed_task_details.append(f"  - {item['description']}: Failed to get status - {e}")
+
+                # Update the count for the task's current state
+                task_states[item.get('state', 'UNSUBMITTED')] += 1
+
+            # --- Create the Live-Updating Status Line ---
+            elapsed_time = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+            status_line = (
+                f"\r[{next(spinner)}] Elapsed: {elapsed_time} | "
+                f"COMPLETED: {task_states['COMPLETED']} | "
+                f"RUNNING: {task_states['RUNNING']} | "
+                f"READY: {task_states['READY']} | "
+                f"FAILED: {task_states['FAILED']} | "
+                f"Total: {len(self.all_tasks)}   "  # Extra spaces to clear previous line
+            )
+            print(status_line, end="")
             
-            if all_done:
-                print("ALL Task FINISHED!")
+            if not active_tasks_exist:
+                print("\n\nAll tasks have reached a terminal state.")
                 break
             
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ongoing task: ({len(active_tasks)}/{len(self.all_tasks)}): {', '.join(active_tasks[:3])}...")
-            time.sleep(60) # check every 60 seconds
-        
-        print("\n--- Get Data Patches ---")
+            time.sleep(15) # Check status every 15 seconds for faster updates
 
+        # --- Final Summary Report ---
+        final_elapsed_time = time.time() - start_time
+        print("\n--- FINAL REPORT ---")
+        print(f"Total monitoring time: {time.strftime('%H hours, %M minutes, %S seconds', time.gmtime(final_elapsed_time))}")
+        print(f"Tasks Completed: {task_states['COMPLETED']}/{len(self.all_tasks)}")
+        print(f"Tasks Failed:    {task_states['FAILED']}/{len(self.all_tasks)}")
         
-        # Because all tasks are parallel, multiple folders with the same name will appear in google drive and need to be merged.
-        print("\n--- Merging Google Drive folders ---")
-        for name in self.base_file_name:
-            print(f"Merging folders: {name}")
-            self.drive_manager.merge_duplicate_folders(name)
-            # move all files to the main folder
-            print(name)
-            self.drive_manager.move_folder(name, self.settings.DRIVE_FOLDER)
+        if failed_task_details:
+            print("\n!!! Details for FAILED tasks !!!")
+            for detail in failed_task_details:
+                print(detail)
+        
+        # --- Post-Processing Steps ---
+        # Only proceed if there are completed tasks to organize and download
+        if task_states['COMPLETED'] > 0:
+            print("\n--- Merging Google Drive folders ---")
+            # Using set to get unique folder names
+            unique_folders = sorted(list(set(self.base_file_name)))
+            for name in unique_folders:
+                print(f"Organizing folder: {name}")
+                self.drive_manager.merge_duplicate_folders(name)
+                self.drive_manager.move_folder(name, self.settings.DRIVE_FOLDER)
             
-        print("\n--- Download files from Google Drive ---")
-        if not os.path.exists(self.settings.LOCAL_DOWNLOAD_DIR):
-            os.makedirs(self.settings.LOCAL_DOWNLOAD_DIR)
-        
-        
-        # get the main folder ID
-        main_folder_id = self.drive_manager.get_gdrive_folder_id(self.settings.DRIVE_FOLDER)
-        if not main_folder_id:
-            print(f"Error：Can not found main folder in Google Drive '{self.settings.DRIVE_FOLDER}'")
-            return
-
-        self.drive_manager.download_folder_recursively(main_folder_id, self.settings.LOCAL_DOWNLOAD_DIR)
-        
-
+            print("\n--- Downloading files from Google Drive ---")
+            if not os.path.exists(self.settings.LOCAL_DOWNLOAD_DIR):
+                os.makedirs(self.settings.LOCAL_DOWNLOAD_DIR)
+            
+            main_folder_id = self.drive_manager.get_gdrive_folder_id(self.settings.DRIVE_FOLDER)
+            if not main_folder_id:
+                print(f"Error: Cannot find main folder in Google Drive '{self.settings.DRIVE_FOLDER}'")
+                return
+            self.drive_manager.download_folder_recursively(main_folder_id, self.settings.LOCAL_DOWNLOAD_DIR)
+        else:
+            print("\nNo tasks completed successfully. Skipping Drive organization and download.")
+            
+        print("\n--- Monitoring and Organization Complete ---")
         return
         
-    
     def launch_single_data_collector(self, feature_info, patch=None):
         """
         Get 7 types of data for a single HUC & original
@@ -161,7 +206,6 @@ class GEEWorkflow:
         self.current_file = base_filename
         self.base_file_name.append(base_filename)
         
-        
         buffered_geometry = original_geometry.buffer(self.settings.BUFFER_DISTANCE_METERS)
         export_region_rectangle = buffered_geometry.bounds()
 
@@ -177,7 +221,6 @@ class GEEWorkflow:
             fileFormat=self.settings.EXPORT_VECTOR_FORMAT
         )
         self.all_tasks.append({'task': task_global, 'description': desc_global})
-        
         
         # Task 1: buffered boundary (vector)
         buffered_fc = ee.FeatureCollection([ee.Feature(buffered_geometry, props)])
@@ -212,7 +255,6 @@ class GEEWorkflow:
         )
         self.all_tasks.append({'task': task_dem, 'description': desc_dem, 'folder': base_filename})
 
-        
         # Task 4 & 5: optical and thermal Landsat images
         landsat_images = self._get_landsat_images(buffered_geometry, self.settings.START_DATE, self.settings.END_DATE)
         landsat_images['optical'] = landsat_images['optical'].reproject(
@@ -252,8 +294,6 @@ class GEEWorkflow:
             crs='EPSG:4269',
             scale =10
         ).clip(export_region_rectangle)
-        
-        
         
         desc_sar = f'SAR_VV_Export_{huc_id}'
         task_sar = ee.batch.Export.image.toDrive(
@@ -296,10 +336,7 @@ class GEEWorkflow:
             map= tools.plot_centers_ee(patch_centers, buffered_geometry)
             map.to_html("visualization.html")
  
-        
         # Get patches 
-        
-           
         print(f"\nGet patches based on the center point by batch...")
         
         batch_size = self.settings.BATCH_EXPORT_SIZE
@@ -354,94 +391,79 @@ class GEEWorkflow:
         # 
         # Task 8: Patches
 
-        
-    def _save_patches(self,raster:ee.Image,index,name):
-        # image = 
-                
-        image_id = raster.id().getInfo()
-        file_name = f"patches_image_{name}_{image_id.replace('/', '_')}"
-        
-        # print(f"Creating image export task {counter+1}/{collection_size} (ID: {image_id})...")
-        # counter +=  1
-        
-        task = ee.batch.Export.image.toDrive(
-            image=raster, 
-            description=f'Export_Image_{index+1}',
+    def _save_patches(self, raster: ee.Image, index: int, name: str):
+        """
+        Exports a final, analysis-ready image patch AND its corresponding metadata file.
+
+        This function implements all best practices:
+        1. Guarantees exact output pixel dimensions using the 'dimensions' parameter.
+        2. Uses robust, predictable naming for files and task descriptions.
+        3. Exports to the common, projected CRS ('EPSG:5070') to prevent distortion.
+        4. Calls a helper to create a metadata file for data provenance.
+        """
+        patch_geometry = raster.geometry()
+        # Extract HUC ID from the current file name for concise, unique naming
+        huc_id = self.current_file.split('_')[1]
+
+        # --- 1. Prepare Metadata Dictionary for Tracking ---
+        # Get the trusted native resolution from the settings file
+        native_resolution = self.settings.SOURCE_RESOLUTIONS.get(name, 'unknown')
+        metadata = {
+            'patch_id': f'patch_{name}_{index}',
+            'data_type': name,
+            'huc_id': huc_id,
+            'native_resolution_meters': native_resolution,
+            'target_patch_size_pixels': self.settings.PATCH_SIZE,
+            'exported_crs': self.settings.TARGET_DEM_CRS, # Record the correct CRS
+            'export_timestamp_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        }
+
+        # --- 2. Create the Image Export Task ---
+        # Use a concise, unique, and valid description for the task
+        image_description = f'HUC_{huc_id}_Img_{name}_{index}'
+        # Use a simple, robust filename
+        image_file_name = f"patch_{name}_{index}"
+        # Define the exact output dimensions (e.g., "256x256")
+        dimensions_str = f"{self.settings.PATCH_SIZE}x{self.settings.PATCH_SIZE}"
+
+        image_task = ee.batch.Export.image.toDrive(
+            image=raster.toFloat(),
+            description=image_description,
             folder=self.current_file,
-            fileNamePrefix=file_name,
-            scale=10,
-            crs='EPSG:4326', # TODO: dangrous
+            fileNamePrefix=image_file_name,
+            region=patch_geometry,
+            dimensions=dimensions_str, # This is the best way to control output size
+            crs=self.settings.TARGET_DEM_CRS, # Ensure consistent CRS
             maxPixels=1e10
         )
-        self.all_tasks.append({'task': task, 'description': f'Export_Image_{name}_{index+1}', 'folder': self.current_file})
+        self.all_tasks.append({'task': image_task, 'description': image_description, 'folder': self.current_file})
 
-        return
+        # --- 3. Call the Helper to Create the Metadata Export Task ---
+        self._save_patch_metadata(metadata, index, name)
     
-    # def _get_patches(self, raster:ee.Image, patch_centers:ee.FeatureCollection, base_filename, data_type=None)->ee.FeatureCollection:
-    #     """
-    #     Extract patches from a raster image based on a grid of center points.
+    def _save_patch_metadata(self, metadata: dict, index: int, name: str):
+        """
+        Exports a metadata JSON file for a single patch.
+        """
+        huc_id = self.current_file.split('_')[1]
 
-    #     This function generates a grid of center points over the raster image and extracts
-    #     patches of specified size around these centers. The patches are returned as a
-    #     FeatureCollection.
+        # Create a concise and unique description and filename
+        description = f'HUC_{huc_id}_Meta_{name}_{index}'
+        file_name = f"patch_{name}_{index}_metadata"
 
-    #     Parameters:
-    #         raster (ee.Image): The input raster image from which patches will be extracted.
-    #         patch_centers (ee.FeatureCollection): A collection of points representing the center of each patch.
-    #         base_filename (str): The base filename for the exported patches.
-    #         data_type (str): The type of data being processed (e.g., 'Landsat_Optical', 'Landsat_Thermal', 'SAR_VV', etc.).
+        # Convert the Python dictionary to a GEE object and export
+        metadata_ee = ee.Dictionary(metadata)
+        feature = ee.Feature(None, metadata_ee)
 
-    #     Returns:
-    #         ee.FeatureCollection: A collection of features representing the extracted patches.
-    #     """
+        task = ee.batch.Export.table.toDrive(
+            collection=ee.FeatureCollection([feature]),
+            description=description,
+            folder=self.current_file,
+            fileNamePrefix=file_name,
+            fileFormat='GeoJSON'
+        )
         
-    #     print(f"\nGet patches based on the center point by batch...")
-        
-    #     batch_size = self.settings.BATCH_EXPORT_SIZE
-    #     num_batches = patch_centers.size().divide(batch_size).ceil().getInfo()
-    #     patch_centers_lists = patch_centers.toList(patch_centers.size())
-        
-    #     for i in range(num_batches):
-    #         print(f"Processing batch {i+1}/{num_batches}...")
-    #         start_index = i * batch_size
-    #         end_index = start_index + batch_size
-            
-    #         valid_patches = ee.FeatureCollection(patch_centers_lists.slice(start_index,end_index))
-    #         image_patches = self._extract_patches_gee(raster, valid_patches, self.settings.PATCH_SIZE)
-
-    #         image_list = image_patches.toList(image_patches.size())
-    #         collection_size = image_list.size().getInfo()
-
-    #         print(f"{collection_size} images is found, start exporting...")
-            
-    #         counter = 0
-    #         # Export each image in the collection to Google Drive
-    #         # export 2 images for testing, to export all images, change the range to collection_size
-    #         print('Testing export patches...Only 2 images will be exported.')
-    #         for i in range(2):
-    #             image = ee.Image(image_list.get(i))
-                
-    #             image_id = image.id().getInfo()
-    #             file_name = f"patches_image_{data_type}_{image_id.replace('/', '_')}"
-                
-    #             print(f"Creating image export task {counter+1}/{collection_size} (ID: {image_id})...")
-    #             counter +=  1
-                
-    #             task = ee.batch.Export.image.toDrive(
-    #                 image=image, 
-    #                 description=f'Export_Image_{counter+1}',
-    #                 folder=base_filename,
-    #                 fileNamePrefix=file_name,
-    #                 scale=10,
-    #                 crs='EPSG:4326',
-    #                 maxPixels=1e10
-    #             )
-    #             self.all_tasks.append({'task': task, 'description': f'Export_Image_{data_type}_{i+1}', 'folder': base_filename})
-
-    #     return 
-        
-        
-    
+        self.all_tasks.append({'task': task, 'description': description, 'folder': self.current_file})
     
     def _genearte_patch_centers(self, raster:ee.Image, patch_size:int, stride:int, bounder:ee.Geometry)->ee.FeatureCollection:
         """
@@ -548,8 +570,12 @@ class GEEWorkflow:
             .filter(ee.Filter.eq('instrumentMode', 'IW')).select('VV')
         return sentinel1_col.median()
 
-    # Delete the old launch_single_data_collector function and replace it with this:
-
+    # New organized processing function
+    # This function replaces the old launch_single_data_collector method
+    # It processes a single HUC by separating the workflow into boundary and raster processing.
+    # It also includes a verification step to ensure correctness of the raster data.
+    # The function is designed to be the main orchestrator for processing a single HUC.
+    # It separates the workflow into boundary and raster processing, ensuring clarity and maintainability.
     def process_single_huc(self, feature_info: dict):
         """
         Main orchestrator for processing a single HUC.
@@ -635,57 +661,56 @@ class GEEWorkflow:
 
     def _process_raster_data(self, geometries: dict, base_filename: str):
         """
-        Processes all raster data: prepares full-size images, discovers resolutions,
-        and generates and exports patches.
-
-        Args:
-            geometries: A dictionary containing 'buffered' and 'rectangle' geometries.
-            base_filename: The base name for exported files and folders.
+        Processes all raster data using explicitly defined resolutions from settings
+        and includes a verification step to ensure correctness.
         """
         print(f"\nProcessing raster data and patches for {base_filename}...")
 
-        # Unpack geometries needed for raster operations
-        original_geometry = geometries['original']
-        buffered_geometry = geometries['buffered']
         export_region_rectangle = geometries['rectangle']
         common_crs = self.settings.TARGET_DEM_CRS
 
-        # --- Raster Data Preparation ---
+        # --- 1. Raster Data Preparation using Explicit Resolutions ---
+        
+        print("Preparing images with explicitly defined resolutions...")
         dem_image = self._get_dem(self.DEM_SOURCE_IMG, export_region_rectangle)
         
         landsat_images_unproj = self._get_landsat_images(export_region_rectangle, self.settings.START_DATE, self.settings.END_DATE)
-        landsat_optical_proj = landsat_images_unproj['optical'].reproject(crs=common_crs)
-        landsat_thermal_proj = landsat_images_unproj['thermal'].reproject(crs=common_crs)
+        sar_image_unproj = self._get_sar_image(export_region_rectangle, self.settings.START_DATE, self.settings.END_DATE)
+        flow_dir_unproj = self.MERIT_HYDRO_IMG.select('dir')
+
+        # Clip median composites first
+        landsat_optical_clipped = landsat_images_unproj['optical'].clip(export_region_rectangle)
+        landsat_thermal_clipped = landsat_images_unproj['thermal'].clip(export_region_rectangle)
+        sar_image_clipped = sar_image_unproj.clip(export_region_rectangle)
+        flow_dir_clipped = flow_dir_unproj.clip(export_region_rectangle)
+        
+        # Reproject using the resolutions defined in settings. This is the most reliable method.
         landsat_images = {
-            'optical': landsat_optical_proj.clip(export_region_rectangle),
-            'thermal': landsat_thermal_proj.clip(export_region_rectangle)
+            'optical': landsat_optical_clipped.reproject(crs=common_crs, scale=self.settings.SOURCE_RESOLUTIONS['optical']),
+            'thermal': landsat_thermal_clipped.reproject(crs=common_crs, scale=self.settings.SOURCE_RESOLUTIONS['thermal'])
+        }
+        sar_image = sar_image_clipped.reproject(crs=common_crs, scale=self.settings.SOURCE_RESOLUTIONS['sar'])
+        flow_dir_final = flow_dir_clipped.reproject(crs=common_crs, scale=self.settings.SOURCE_RESOLUTIONS['flow'])
+
+        # --- 2. Quality Control: Verify Resolutions Programmatically ---
+        
+        print("\nVerifying image resolutions against configuration...")
+        images_to_verify = {
+            'dem': dem_image, 'optical': landsat_images['optical'], 'thermal': landsat_images['thermal'],
+            'sar': sar_image, 'flow': flow_dir_final
         }
         
-        sar_image_unproj = self._get_sar_image(export_region_rectangle, self.settings.START_DATE, self.settings.END_DATE)
-        sar_image_proj = sar_image_unproj.reproject(crs=common_crs)
-        sar_image = sar_image_proj.clip(export_region_rectangle)
-        
-        flow_dir_proj = self.MERIT_HYDRO_IMG.select('dir').reproject(crs=common_crs)
-        flow_dir_final = flow_dir_proj.clip(export_region_rectangle)
+        for name, image in images_to_verify.items():
+            expected_scale = self.settings.SOURCE_RESOLUTIONS[name]
+            actual_scale = image.projection().nominalScale().getInfo()
+            # Assert that the actual scale is within 5% of the expected scale to handle floating point variations
+            assert abs(actual_scale - expected_scale) / expected_scale < 0.05, \
+                f"'{name}' resolution mismatch! Expected ~{expected_scale}m, but GEE reports {actual_scale:.2f}m."
+            print(f"  - {name.title()}: OK (Verified ~{actual_scale:.2f}m)")
 
-        # --- Discover Resolutions Dynamically ---
-        print("Discovering native resolutions from source images...")
-        try:
-            source_resolutions = {
-                'dem': dem_image.projection().nominalScale().getInfo(),
-                'optical': landsat_images['optical'].projection().nominalScale().getInfo(),
-                'thermal': landsat_images['thermal'].projection().nominalScale().getInfo(),
-                'sar': sar_image.projection().nominalScale().getInfo(),
-                'flow': flow_dir_final.projection().nominalScale().getInfo()
-            }
-            print(f"Discovered Resolutions (m): {source_resolutions}")
-        except Exception as e:
-            print(f"Could not dynamically discover resolutions. Error: {e}. Falling back to settings.")
-            source_resolutions = self.settings.SOURCE_RESOLUTIONS
-
-        # --- Patch Generation ---
-        print("--- Generating Patches ---")
-        patch_centers = self._genearte_patch_centers(dem_image, self.settings.PATCH_SIZE, self.settings.PATCH_STRIDE, original_geometry)
+        # --- 3. Patch Generation (No changes needed) ---
+        print("\n--- Generating Patches ---")
+        patch_centers = self._genearte_patch_centers(dem_image, self.settings.PATCH_SIZE, self.settings.PATCH_STRIDE, geometries['buffered'])
         print(f"Patch centers generated. Total centers: {patch_centers.size().getInfo()}")
 
         # ... (Patch extraction and export loop) ...
@@ -694,7 +719,7 @@ class GEEWorkflow:
         patch_centers_lists = patch_centers.toList(patch_centers.size())
         
         # Loop through batches for export
-        for i in range(1): # Using 1 batch for testing
+        for i in range(1): # Using 1 batch for testing # num_batches all patches
             print(f"Processing batch {i+1}/{num_batches}...")
             start_index = i * batch_size
             end_index = start_index + batch_size
@@ -709,11 +734,76 @@ class GEEWorkflow:
             collection_size = ee.Number(dem_patches.size()).getInfo()
             print(f"{collection_size} patch locations found in batch, starting export...")
             
-            if collection_size > 0:
-                for j in range(1): # Exporting 1 patch for testing
-                    self._save_patches(ee.Image(dem_patches.get(j)), j, 'dem', source_resolutions['dem'])
-                    self._save_patches(ee.Image(opt_patches.get(j)), j, 'opt', source_resolutions['optical'])
-                    self._save_patches(ee.Image(the_patches.get(j)), j, 'the', source_resolutions['thermal'])
-                    self._save_patches(ee.Image(sar_patches.get(j)), j, 'sar', source_resolutions['sar'])
-                    self._save_patches(ee.Image(flow_patches.get(j)), j, 'flow', source_resolutions['flow'])
+            if collection_size > 0: 
+                for j in range(1): # export 2 images for testing, to export all images, change the range to collection_size
+                    self._save_patches(ee.Image(dem_patches.get(j)), j, 'dem')
+                    self._save_patches(ee.Image(opt_patches.get(j)), j, 'opt')
+                    self._save_patches(ee.Image(the_patches.get(j)), j, 'the')
+                    self._save_patches(ee.Image(sar_patches.get(j)), j, 'sar')
+                    self._save_patches(ee.Image(flow_patches.get(j)), j, 'flow')
                     
+
+    
+    # def _get_patches(self, raster:ee.Image, patch_centers:ee.FeatureCollection, base_filename, data_type=None)->ee.FeatureCollection:
+    #     """
+    #     Extract patches from a raster image based on a grid of center points.
+
+    #     This function generates a grid of center points over the raster image and extracts
+    #     patches of specified size around these centers. The patches are returned as a
+    #     FeatureCollection.
+
+    #     Parameters:
+    #         raster (ee.Image): The input raster image from which patches will be extracted.
+    #         patch_centers (ee.FeatureCollection): A collection of points representing the center of each patch.
+    #         base_filename (str): The base filename for the exported patches.
+    #         data_type (str): The type of data being processed (e.g., 'Landsat_Optical', 'Landsat_Thermal', 'SAR_VV', etc.).
+
+    #     Returns:
+    #         ee.FeatureCollection: A collection of features representing the extracted patches.
+    #     """
+        
+    #     print(f"\nGet patches based on the center point by batch...")
+        
+    #     batch_size = self.settings.BATCH_EXPORT_SIZE
+    #     num_batches = patch_centers.size().divide(batch_size).ceil().getInfo()
+    #     patch_centers_lists = patch_centers.toList(patch_centers.size())
+        
+    #     for i in range(num_batches):
+    #         print(f"Processing batch {i+1}/{num_batches}...")
+    #         start_index = i * batch_size
+    #         end_index = start_index + batch_size
+            
+    #         valid_patches = ee.FeatureCollection(patch_centers_lists.slice(start_index,end_index))
+    #         image_patches = self._extract_patches_gee(raster, valid_patches, self.settings.PATCH_SIZE)
+
+    #         image_list = image_patches.toList(image_patches.size())
+    #         collection_size = image_list.size().getInfo()
+
+    #         print(f"{collection_size} images is found, start exporting...")
+            
+    #         counter = 0
+    #         # Export each image in the collection to Google Drive
+    #         # export 2 images for testing, to export all images, change the range to collection_size
+    #         print('Testing export patches...Only 2 images will be exported.')
+    #         for i in range(2):
+    #             image = ee.Image(image_list.get(i))
+                
+    #             image_id = image.id().getInfo()
+    #             file_name = f"patches_image_{data_type}_{image_id.replace('/', '_')}"
+                
+    #             print(f"Creating image export task {counter+1}/{collection_size} (ID: {image_id})...")
+    #             counter +=  1
+                
+    #             task = ee.batch.Export.image.toDrive(
+    #                 image=image, 
+    #                 description=f'Export_Image_{counter+1}',
+    #                 folder=base_filename,
+    #                 fileNamePrefix=file_name,
+    #                 scale=10,
+    #                 crs='EPSG:4326',
+    #                 maxPixels=1e10
+    #             )
+    #             self.all_tasks.append({'task': task, 'description': f'Export_Image_{data_type}_{i+1}', 'folder': base_filename})
+
+    #     return 
+        
