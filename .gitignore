@@ -42,6 +42,8 @@ experiments/
 data/raw/
 data/processed/
 data/meta/
+data/script/gee_downloads/
+data/script/datasets/
 
 # Temporary or intermediate data
 *.npy
