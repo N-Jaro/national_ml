@@ -1,5 +1,7 @@
 # Data Processing
-*Update: Jun 24/ 2025 by Dingqi*
+*Update: Jun 30/ 2025 by Dingqi*
+
+> New: Dataloader.
 
 > Check gee_tools.py ->launch_single_data_collector function before run it!
 
@@ -98,7 +100,7 @@ This is to give your Python script the permission to access your Google Drive.
 
 1. Move original HUC boundaries to HUC folder
 
-2. Create tools set for visualization patch center and patch size. setting in config.py VISUALIZE_POINTS. 
+2. Create tools set for visualization patch centers and patches. setting in config.py VISUALIZE_POINTS. patch center will visualized as 'visualization.html' and patches will visualized as 'test.html',
 
 
 3. Get patches and auto downloads(Highly recommend to run only a portion of the code during testing (comment out the rest in gee_tools), as running the full workflow can be time-consuming.)

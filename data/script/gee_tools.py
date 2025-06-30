@@ -345,10 +345,11 @@ class GEEWorkflow:
                 self._save_patches(ee.Image(flow_image_patches.get(i)),i,'flow')
                 
                 # test
-                map = tools.plot_raster_patches_ee(ee.Image(dem_image_patches.get(i)),ee.Image(opt_image_patches.get(i))
+                if self.settings.VISUALIZE_POINTS:
+                    map = tools.plot_raster_patches_ee(ee.Image(dem_image_patches.get(i)),ee.Image(opt_image_patches.get(i))
                                                    ,ee.Image(the_image_patches.get(i)),ee.Image(sar_image_patches.get(i))
                                                    ,ee.Image(flow_image_patches.get(i)),boundary=buffered_geometry)
-                map.to_html("test.html")   
+                    map.to_html("test.html")   
         
         return 
         # 
