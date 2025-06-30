@@ -42,24 +42,24 @@ def run_pipeline():
     #     except Exception as e:
     #         print(f"An error occurred during statistics calculation for HUC {huc_id}: {e}")
 
-    # --- STAGE 4: Raw Patch Fetching ---
-    print("\n--- STARTING STAGE 4: Raw Patch Fetching ---")
-    for huc_id in settings.HUC_IDS_TO_PROCESS:
-        huc_folder_path = os.path.join(huc_root_folder, huc_id)
-        if not os.path.isdir(huc_folder_path): continue
-        try:
-            csv_path = os.path.join(huc_folder_path, f'huc8_{huc_id}_center_points.csv')
-            if not os.path.exists(csv_path): continue
+    # # --- STAGE 4: Raw Patch Fetching ---
+    # print("\n--- STARTING STAGE 4: Raw Patch Fetching ---")
+    # for huc_id in settings.HUC_IDS_TO_PROCESS:
+    #     huc_folder_path = os.path.join(huc_root_folder, huc_id)
+    #     if not os.path.isdir(huc_folder_path): continue
+    #     try:
+    #         csv_path = os.path.join(huc_folder_path, f'huc8_{huc_id}_center_points.csv')
+    #         if not os.path.exists(csv_path): continue
             
-            print(f"\nProcessing raw patches for HUC {huc_id}...")
-            center_points = pd.read_csv(csv_path).to_dict('records')
-            if not center_points: continue
+    #         print(f"\nProcessing raw patches for HUC {huc_id}...")
+    #         center_points = pd.read_csv(csv_path).to_dict('records')
+    #         if not center_points: continue
 
-            patch_huc_output_folder = os.path.join(patch_root_folder, huc_id)
-            patch_processor = PatchProcessor(center_points=center_points, output_folder=patch_huc_output_folder, settings=settings, huc_id=huc_id)
-            patch_processor.run()
-        except Exception as e:
-            print(f"An error occurred during patch processing for HUC {huc_id}: {e}")
+    #         patch_huc_output_folder = os.path.join(patch_root_folder, huc_id)
+    #         patch_processor = PatchProcessor(center_points=center_points, output_folder=patch_huc_output_folder, settings=settings, huc_id=huc_id)
+    #         patch_processor.run()
+    #     except Exception as e:
+    #         print(f"An error occurred during patch processing for HUC {huc_id}: {e}")
 
     # # --- STAGE 5: Local Reference Data Generation ---
     # print("\n--- STARTING STAGE 5: Local Reference Data Processing ---")

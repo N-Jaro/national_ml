@@ -1,3 +1,112 @@
+# 🚀 National Watershed ML Pipeline
+*Update: Jun 29/ 2025 by Nathan*
+This repository contains a **multi-stage machine learning pipeline** for processing HUC8 watersheds, exporting terrain and satellite data from Google Earth Engine, extracting multi-source satellite patches, and generating local hydrography reference layers.
+
+---
+
+## 📌 Pipeline Overview
+
+The pipeline consists of the following stages:
+
+### 1. **HUC Processing**
+- Generates patch center points for each HUC8 watershed.
+- Exports full HUC DEM from **Google Earth Engine (GEE)** for local processing.
+
+### 2. **Automated Download from Google Drive**
+- Merges and downloads exported files from Google Drive.
+- Handles duplicate folders automatically created by GEE exports.
+
+### 3. **Patch Extraction**
+- Downloads **multi-source**, **multi-resolution** data patches:
+  - DEM
+  - Landsat optical & thermal
+  - Sentinel-1 SAR
+
+### 4. **Local Reference Data Generation**
+- Generates hydrography and **flow direction rasters** aligned with patches.
+
+### 5. **(Optional) Statistics Calculation**
+- Computes normalization statistics (mean, std) for each HUC (currently optional).
+
+---
+
+## 📁 Folder Structure
+
+```
+national_ml/
+├── data/
+│   └── script/
+│       ├── config.py                   # Pipeline configuration
+│       ├── huc_process.py              # Export DEMs & patch centers
+│       ├── patch_process.py            # Extract and save patches
+│       ├── stats_process.py            # Compute normalization stats (optional)
+│       ├── local_reference_process.py  # Generate flow direction & hydrography
+│       ├── gdrive_manager.py           # Google Drive integration
+│       └── run_pipeline.py             # Main entry point
+├── pipeline_output/
+│   ├── huc_processing/                 # Contains DEMs and patch centers
+│   └── patch_dataset/                  # Contains extracted patch data
+└── README.md
+```
+
+---
+
+## 🚀 Usage
+
+### 1. Prerequisites
+
+- Python **3.8+**
+- Google Earth Engine Python API
+- Google Drive API credentials
+
+#### Required Python packages:
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### 2. Setup
+
+- Place your Google Drive `credentials.json` in the `script/` directory.
+- Edit `config.py`:
+  - Set target HUC8 IDs
+  - Adjust patch size, stride, and export settings as needed.
+- *(Optional)* Download NHD shapefiles or GPKGs for local hydrography reference layers.
+
+---
+
+### 3. Run the Pipeline
+
+From the `data/script/` directory, run:
+```bash
+python run_pipeline.py
+```
+
+The pipeline will:
+- Generate patch centers and export DEMs from GEE.
+- Download and organize exports from Google Drive.
+- Extract DEM, Landsat, and SAR patches.
+- (Optionally) Generate local hydrography and compute normalization statistics.
+
+---
+
+## 🧰 Troubleshooting
+
+- ✅ Ensure valid GEE and Google Drive credentials.
+- 🔍 If you get 0 patch centers, verify geometry alignment with DEM.
+- 🧠 Large HUCs = more time, memory, and disk.
+- 📂 Use GPKG instead of Shapefile if your NHD data exceeds 2GB or has long field names.
+
+---
+
+## 📒 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+
+==============================================================
+
 # Data Processing
 *Update: Jun 24/ 2025 by Dingqi*
 

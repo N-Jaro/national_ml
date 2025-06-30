@@ -6,6 +6,7 @@ import time
 import re
 import pandas as pd
 from config import Settings
+import itertools 
 
 class HUCProcessor:
     """
@@ -57,8 +58,12 @@ class HUCProcessor:
             print(f"  Creating background task to export DEM for HUC {huc8_id}...")
             desc_dem = f'DEM_Export_HUC_{huc8_id}'
             dem_task = ee.batch.Export.image.toDrive(
-                image=dem_reprojected.toFloat(), description=desc_dem, folder=gdrive_folder_name,
-                fileNamePrefix=f'huc8_{huc8_id}_dem', fileFormat='GeoTIFF'
+                image=dem_reprojected.toFloat(), 
+                description=desc_dem, 
+                folder=gdrive_folder_name, 
+                fileNamePrefix=f'huc8_{huc8_id}_dem', 
+                fileFormat='GeoTIFF',
+                maxPixels=1e10 
             )
             self.all_tasks.append({'task': dem_task, 'description': desc_dem})
 
@@ -91,33 +96,85 @@ class HUCProcessor:
             print(f"  Successfully saved center points locally to '{csv_path}'")
         except Exception as e:
             print(f"An error occurred while processing HUC {huc8_id}: {e}")
+    
+    def _monitor_tasks(self):
+        """
+        Monitors all launched GEE tasks with a detailed, live-updating
+        status line until completion.
+        """
+        print("\n--- Monitoring GEE Tasks ---")
+        start_time = time.time()
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
+
+        while True:
+            task_states = {'COMPLETED': 0, 'FAILED': 0, 'RUNNING': 0, 'READY': 0}
+            failed_task_details = []
+            active_tasks_exist = False
+
+            for item in self.all_tasks:
+                task = item['task']
+                # Only poll the status if it's not in a terminal state
+                if item.get('state') not in ['COMPLETED', 'FAILED', 'CANCELLED']:
+                    try:
+                        status = task.status()
+                        current_state = status['state']
+                        item['state'] = current_state  # Update state in our local list
+
+                        if current_state in ['RUNNING', 'READY']:
+                            active_tasks_exist = True
+                        
+                        if current_state == 'FAILED':
+                            error_message = status.get('error_message', 'Unknown error')
+                            failed_task_details.append(f"  - {item['description']}: {error_message}")
+                    except Exception as e:
+                        item['state'] = 'RUNNING' # Assume it's still active on network error
+                        active_tasks_exist = True
+                
+                # Update the count for the task's current state
+                task_states[item.get('state', 'READY')] += 1
+
+            elapsed_time = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+            status_line = (
+                f"\r[{next(spinner)}] Elapsed: {elapsed_time} | "
+                f"COMPLETED: {task_states['COMPLETED']} | "
+                f"RUNNING: {task_states['RUNNING']} | "
+                f"READY: {task_states['READY']} | "
+                f"FAILED: {task_states['FAILED']} | "
+                f"Total: {len(self.all_tasks)}   "
+            )
+            print(status_line, end="")
+            
+            if not active_tasks_exist:
+                print("\n\nAll GEE export tasks have reached a terminal state.")
+                break
+            
+            time.sleep(30)
+
+        # Final Summary Report
+        if failed_task_details:
+            print("\n\n!!! WARNING: Some GEE tasks failed !!!")
+            for detail in failed_task_details:
+                print(detail)
+        else:
+            print("\nAll GEE tasks completed successfully.")
 
     def run(self):
-        
-        for huc_id in self.settings.HUC_IDS_TO_PROCESS: self._process_single_huc(huc_id)
-        if not self.all_tasks: print("No tasks were created. Exiting."); return
-        print(f"\n--- {len(self.all_tasks)} tasks have been created, starting them now... ---")
+        """
+        Executes the entire workflow for the HUCs defined in settings.
+        """
+        for huc_id in self.settings.HUC_IDS_TO_PROCESS:
+            self._process_single_huc(huc_id)
+            
+        if not self.all_tasks:
+            print("No tasks were created. Exiting."); return
+
+        print(f"\n--- {len(self.all_tasks)} GEE export tasks created, starting them now... ---")
         for item in self.all_tasks:
             try:
                 task, description = item['task'], item['description']
-                task.start(); print(f"  Initiated task: {description}")
+                task.start()
+                print(f"  Initiated task: {description}")
             except Exception as e:
                 print(f"!!! FAILED TO START TASK: {item.get('description', 'Unknown')} - Error: {e} !!!")
+        
         self._monitor_tasks()
-    
-    def _monitor_tasks(self):
-        # ... (monitor logic remains the same)
-        print("\n--- Monitoring GEE Tasks ---")
-        while any(item['task'].active() for item in self.all_tasks):
-            active_tasks = [item for item in self.all_tasks if item['task'].active()]
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting for {len(active_tasks)} tasks to complete...")
-            time.sleep(60)
-        print("\nAll tasks have completed.")
-        failed_tasks = [item for item in self.all_tasks if item['task'].state == ee.batch.Task.State.FAILED]
-        if failed_tasks:
-            print("\n!!! WARNING: Some tasks failed !!!")
-            for item in failed_tasks:
-                task = item['task']
-                print(f"  - Task: {item['description']}, State: {task.state}, Error: {task.status().get('error_message', 'Unknown')}")
-        else:
-            print("All tasks completed successfully.")
