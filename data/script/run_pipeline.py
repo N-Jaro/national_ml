@@ -17,20 +17,20 @@ def run_pipeline():
     huc_root_folder = os.path.join(settings.ROOT_OUTPUT_FOLDER, settings.HUC_OUTPUT_FOLDER)
     patch_root_folder = os.path.join(settings.ROOT_OUTPUT_FOLDER, settings.PATCH_OUTPUT_FOLDER)
 
-    # --- STAGE 1: HUC Processing (Center Points & Full DEM Export) ---
-    print("--- STARTING STAGE 1: HUC Processing ---")
-    huc_processor = HUCProcessor(settings=settings)
-    huc_processor.run()
+    # # --- STAGE 1: HUC Processing (Center Points & Full DEM Export) ---
+    # print("--- STARTING STAGE 1: HUC Processing ---")
+    # huc_processor = HUCProcessor(settings=settings)
+    # huc_processor.run()
     
-    # --- STAGE 2: Automated Download from Google Drive ---
-    print("\n--- STARTING STAGE 2: Automated Download from Google Drive ---")
-    try:
-        drive_manager = GoogleDriveManager(settings=settings)
-        for huc_id in settings.HUC_IDS_TO_PROCESS:
-            drive_manager.merge_and_download_huc_outputs(huc_id=huc_id, local_destination_path=os.path.join(huc_root_folder, huc_id))
-        print("\nAutomated download and cleanup complete.")
-    except Exception as e:
-        print(f"\n!!! AUTOMATED DOWNLOAD FAILED: {e} !!!"); input("\nPress Enter to continue...")
+    # # --- STAGE 2: Automated Download from Google Drive ---
+    # print("\n--- STARTING STAGE 2: Automated Download from Google Drive ---")
+    # try:
+    #     drive_manager = GoogleDriveManager(settings=settings)
+    #     for huc_id in settings.HUC_IDS_TO_PROCESS:
+    #         drive_manager.merge_and_download_huc_outputs(huc_id=huc_id, local_destination_path=os.path.join(huc_root_folder, huc_id))
+    #     print("\nAutomated download and cleanup complete.")
+    # except Exception as e:
+    #     print(f"\n!!! AUTOMATED DOWNLOAD FAILED: {e} !!!"); input("\nPress Enter to continue...")
 
     # # --- STAGE 3: Statistics Calculation ---
     # print("\n--- STARTING STAGE 3: Calculating Normalization Statistics ---")
@@ -61,19 +61,19 @@ def run_pipeline():
     #     except Exception as e:
     #         print(f"An error occurred during patch processing for HUC {huc_id}: {e}")
 
-    # # --- STAGE 5: Local Reference Data Generation ---
-    # print("\n--- STARTING STAGE 5: Local Reference Data Processing ---")
-    # try:
-    #     nhd_flowlines_path = "path/to/your/NHDFlowline.shp"
-    #     nhd_waterbodies_path = "path/to/your/NHDWaterbody.shp"
-    #     if not os.path.exists(nhd_flowlines_path) or not os.path.exists(nhd_waterbodies_path):
-    #         print("Warning: NHD Shapefiles not found. Skipping local reference processing.")
-    #     else:
-    #         local_processor = LocalReferenceProcessor(settings=settings, nhd_flowline_shapefile=nhd_flowlines_path, nhd_waterbody_shapefile=nhd_waterbodies_path)
-    #         local_processor.run()
-    #         print("\nLocal reference processing complete.")
-    # except Exception as e:
-    #     print(f"An error occurred during local reference processing: {e}")
+    # --- STAGE 5: Local Reference Data Generation ---
+    print("\n--- STARTING STAGE 5: Local Reference Data Processing ---")
+    try:
+        nhd_gdb_path = "/u/nathanj/national_ml/data/raw/nhdplus_gdb/NHDPlus_H_National_Release_2.gdb"
+        
+        if not os.path.exists(nhd_gdb_path):
+            print("Warning: NHD Shapefiles not found. Skipping local reference processing.")
+        else:
+            local_processor = LocalReferenceProcessor(settings=settings, nhd_gdb_path=nhd_gdb_path)
+            local_processor.run()
+            print("\nLocal reference processing complete.")
+    except Exception as e:
+        print(f"An error occurred during local reference processing: {e}")
             
     print("\n--- PIPELINE COMPLETE ---")
 

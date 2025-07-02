@@ -1,10 +1,10 @@
-# local_reference_process.py
-
 import os
 import numpy as np
 import geopandas as gpd
+import pandas as pd
 import rasterio
 from rasterio import features
+from rasterio.windows import from_bounds
 from pysheds.grid import Grid
 from tqdm import tqdm
 from config import Settings
@@ -14,20 +14,17 @@ class LocalReferenceProcessor:
     Processes local data to create hydrography and flow direction reference layers
     that perfectly align with previously downloaded GEE patches.
     """
-    def __init__(self, settings: Settings, nhd_flowline_shapefile: str, nhd_waterbody_shapefile: str):
+    def __init__(self, settings: Settings, nhd_gdb_path: str):
         """
         Initializes the processor.
 
         Args:
             settings (Settings): The global configuration object.
-            nhd_flowline_shapefile (str): Path to the local NHD Flowline shapefile.
-            nhd_waterbody_shapefile (str): Path to the local NHD Waterbody shapefile.
+            nhd_gdb_path (str): Path to the local NHD GeoDatabase (.gdb) file.
         """
         self.settings = settings
-        print("Loading NHD shapefiles into memory...")
-        self.flowlines_gdf = gpd.read_file(nhd_flowline_shapefile)
-        self.waterbodies_gdf = gpd.read_file(nhd_waterbody_shapefile)
-        print("Shapefiles loaded.")
+        self.nhd_gdb_path = nhd_gdb_path
+        print("NHD GeoDatabase path has been set.")
 
     def _calculate_d8_flow_direction(self, dem_path: str, output_path: str):
         """
@@ -37,50 +34,135 @@ class LocalReferenceProcessor:
             return # Skip if already processed
 
         print(f"    - Calculating D8 Flow Direction from '{os.path.basename(dem_path)}'...")
-        grid = Grid.from_raster(dem_path, data_name='dem')
         
-        # Preprocessing: Fill sinks
-        grid.fill_depressions(data='dem', out_name='flooded_dem')
-        
-        # Calculate D8 flow direction
-        grid.flowdir(data='flooded_dem', out_name='d8', routing='d8')
-        
-        # Save the D8 grid to a raster file
-        grid.to_raster('d8', output_path)
+        # Pre-process the DEM to ensure it has a valid nodata value
+        temp_dem_path = dem_path.replace('.tif', '_corrected.tif')
 
-    def _create_hydro_mask(self, dem_template_path: str, output_path: str):
+        print("      - Step 1: Pre-processing DEM...")
+        with rasterio.open(dem_path) as src:
+            profile = src.profile
+            dem_array = src.read(1)
+
+            # Determine a valid nodata value based on dtype
+            dtype = dem_array.dtype
+            if np.issubdtype(dtype, np.unsignedinteger):
+                nodata_val = 65535
+            elif np.issubdtype(dtype, np.floating):
+                nodata_val = np.nan
+            else:
+                nodata_val = -32767
+
+            # Optional: Mask extreme or invalid values
+            dem_array = np.where(np.isnan(dem_array) | (dem_array <= -9999), nodata_val, dem_array)
+            
+            # Update profile
+            profile.update(nodata=nodata_val)
+
+            # Save corrected DEM to a temporary file
+            with rasterio.open(temp_dem_path, 'w', **profile) as dst:
+                dst.write(dem_array, 1)
+
+        try:
+            print("      - Step 2: Calclate Flow Direction (D8) ...")
+            print("        - Loading DEM into PySheds Grid...")
+            grid = Grid.from_raster(temp_dem_path)
+            dem = grid.read_raster(temp_dem_path)
+
+            print("        - Filling pits...")
+            pit_filled_dem = grid.fill_pits(dem)
+            
+            print("        - Filling depressions...")
+            flooded_dem = grid.fill_depressions(pit_filled_dem)
+
+            print("        - Resolving flats...")
+            inflated_dem = grid.resolve_flats(flooded_dem)
+
+            print("        - Calculating D8 flow direction...")
+            dirmap = (64, 128, 1, 2, 4, 8, 16, 32)
+            fdir = grid.flowdir(inflated_dem, dirmap=dirmap, nodata_out = np.int32(-1))
+
+            print(f"        - Saving D8 flow direction to: {output_path}")
+            grid.to_raster(fdir, output_path)
+            print("        - D8 raster saved successfully.")
+            
+        except Exception as e:
+            print(f"      - Error during PySheds processing: {e}")
+        finally:
+            # Clean up the temporary corrected DEM file
+            if os.path.exists(temp_dem_path):
+                os.remove(temp_dem_path)
+                print(f"      - Cleaned up temporary file: {os.path.basename(temp_dem_path)}")
+
+    def _create_hydro_mask(self, dem_template_path: str, huc_boundary_path: str, output_path: str):
         """
-        Creates a hydrography mask by burning NHD vectors onto a DEM template grid.
+        Creates a hydrography mask by burning NHD vectors from a GDB onto a DEM template grid.
         """
         if os.path.exists(output_path):
-            return # Skip if already processed
+            return
             
         print(f"    - Creating Hydrography Mask based on '{os.path.basename(dem_template_path)}'...")
+        
+        # Step 1: Load template raster metadata and HUC boundary
         with rasterio.open(dem_template_path) as src:
             meta = src.meta.copy()
-            meta.update(compress='lzw', dtype='uint8', count=1, nodata=0)
-            bounds = src.bounds
-
-        # Find NHD features that intersect with the HUC bounds
-        flowlines_subset = self.flowlines_gdf.cx[bounds.left:bounds.right, bounds.bottom:bounds.top]
-        waterbodies_subset = self.waterbodies_gdf.cx[bounds.left:bounds.right, bounds.bottom:bounds.top]
+            raster_crs = src.crs
+            raster_transform = src.transform
+            raster_shape = (src.height, src.width)
         
-        geoms_to_burn = []
-        if not flowlines_subset.empty:
-            geoms_to_burn.extend(flowlines_subset.geometry.tolist())
-        if not waterbodies_subset.empty:
-            geoms_to_burn.extend(waterbodies_subset.geometry.tolist())
+        huc8_geo = gpd.read_file(huc_boundary_path)
+        
+        # THE FIX: Perform the initial bounding box query in the NHD's native CRS.
+        # We assume NHD GDB is in a geographic CRS like EPSG:4269 or WGS84 (EPSG:4326)
+        # First, get the HUC bounds in a geographic CRS
+        huc8_geographic = huc8_geo.to_crs("EPSG:4269")
+        bbox_geographic = tuple(huc8_geographic.total_bounds)
 
-        if not geoms_to_burn:
-            mask = np.zeros((meta['height'], meta['width']), dtype=np.uint8)
+        # Step 2: Read & clip NHD layers from the GeoDatabase
+        layers_to_read = ["NetworkNHDFlowline", "NHDWaterbody", "NonNetworkNHDFlowline"] 
+        combined_gdfs = []
+
+        for layer in layers_to_read:
+            print(f"      - Reading and clipping {layer}...")
+            try:
+                # Use the geographic bounding box for an efficient initial read
+                gdf = gpd.read_file(self.nhd_gdb_path, layer=layer, bbox=bbox_geographic)
+                # Clip precisely to the geographic HUC geometry
+                gdf_clipped = gdf[gdf.intersects(huc8_geographic.unary_union)]
+                if not gdf_clipped.empty:
+                    combined_gdfs.append(gdf_clipped)
+            except Exception as e:
+                print(f"        - Could not read or clip layer '{layer}'. It may not exist for this region. Error: {e}")
+
+        if not combined_gdfs:
+            print("      - No NHD features found in the HUC boundary. Creating empty mask.")
+            mask = np.zeros(raster_shape, dtype=np.uint8)
         else:
+            # Step 3: Combine, Reproject, and Buffer
+            print("      - Combining layers...")
+            # The CRS of the concatenated GDF will be the CRS of the source GDB data
+            combined_gdf = gpd.GeoDataFrame(pd.concat(combined_gdfs, ignore_index=True), crs=gdf.crs)
+            
+            print("      - Reprojecting to match DEM and buffering 15m...")
+            # Reproject to match the raster's CRS *before* buffering in meters
+            combined_gdf_reproj = combined_gdf.to_crs(raster_crs)
+            buffered = combined_gdf_reproj.buffer(15)
+
+            # Step 4: Rasterize
+            print("      - Rasterizing buffered features...")
             mask = features.rasterize(
-                geometries=geoms_to_burn, out_shape=(meta['height'], meta['width']),
-                transform=meta['transform'], fill=0, default_value=1, dtype=np.uint8
+                ((geom, 1) for geom in buffered if geom is not None and geom.is_valid),
+                out_shape=raster_shape,
+                transform=raster_transform,
+                fill=0,
+                dtype="uint8"
             )
-        
+
+        # Step 5: Save Raster
+        print(f"      - Saving raster to: {os.path.basename(output_path)}")
+        meta.update({'dtype': 'uint8', 'count': 1, 'compress': 'lzw', 'nodata': 0})
         with rasterio.open(output_path, 'w', **meta) as dst:
             dst.write(mask, 1)
+
 
     def run(self):
         """
@@ -95,22 +177,25 @@ class LocalReferenceProcessor:
 
         for huc_id in tqdm(huc_folders, desc="Processing HUCs Locally"):
             huc_dem_path = os.path.join(huc_root_folder, huc_id, f'huc8_{huc_id}_dem.tif')
+            huc_boundary_path = os.path.join(huc_root_folder, huc_id, f'huc8_{huc_id}_boundary.geojson')
             huc_dir_patches = os.path.join(patch_root_folder, huc_id)
 
-            if not os.path.exists(huc_dem_path):
-                print(f"Warning: DEM for HUC {huc_id} not found. Skipping.")
+            if not os.path.exists(huc_dem_path) or not os.path.exists(huc_boundary_path):
+                print(f"Warning: DEM or Boundary file for HUC {huc_id} not found. Skipping.")
                 continue
 
-            # Define paths for the new full-HUC reference rasters
             flow_dir_path = os.path.join(huc_dir_patches, 'flow_direction.tif')
             hydro_mask_path = os.path.join(huc_dir_patches, 'hydro_mask.tif')
 
-            # 1. Create the full reference rasters for the HUC
             self._calculate_d8_flow_direction(huc_dem_path, flow_dir_path)
-            self._create_hydro_mask(huc_dem_path, hydro_mask_path)
+            self._create_hydro_mask(huc_dem_path, huc_boundary_path, hydro_mask_path)
 
-            # 2. Extract patches from the new reference rasters
             print("    - Extracting reference patches and updating .npz files...")
+            
+            if not os.path.exists(flow_dir_path) or not os.path.exists(hydro_mask_path):
+                print(f"Warning: Reference TIFs for HUC {huc_id} not created. Skipping patch update.")
+                continue
+
             with rasterio.open(flow_dir_path) as flow_src, rasterio.open(hydro_mask_path) as hydro_src:
                 patch_files = [f for f in os.listdir(huc_dir_patches) if f.endswith('.npz')]
                 for patch_file_name in patch_files:
@@ -120,17 +205,25 @@ class LocalReferenceProcessor:
                     
                     if not os.path.exists(template_tif_path): continue
 
-                    # Use the patch template to define the window to read
+                    # THE FIX: Use the patch template's bounds but the HUC raster's transform
                     with rasterio.open(template_tif_path) as template_src:
-                        window = template_src.window(*template_src.bounds)
-                        flow_dir_patch = flow_src.read(1, window=window)
-                        hydro_mask_patch = hydro_src.read(1, window=window)
+                        bounds = template_src.bounds
+                        # Calculate the window for the large flow direction raster
+                        flow_window = from_bounds(*bounds, transform=flow_src.transform)
+                        # Calculate the window for the large hydro mask raster
+                        hydro_window = from_bounds(*bounds, transform=hydro_src.transform)
 
-                    # Update the .npz file
-                    with np.load(npz_path) as existing_data:
-                        updated_data = {key: existing_data[key] for key in existing_data}
+                        # Read the data from the correct window
+                        flow_dir_patch = flow_src.read(1, window=flow_window)
+                        hydro_mask_patch = hydro_src.read(1, window=hydro_window)
+
+                    try:
+                        with np.load(npz_path) as existing_data:
+                            updated_data = {key: existing_data[key] for key in existing_data}
+                    except Exception as e:
+                        print(f"Skipping {npz_path}: could not load .npz file. Reason: {e}")
+                        continue
                     
                     updated_data['flow_dir'] = flow_dir_patch
                     updated_data['hydro_mask'] = hydro_mask_patch
                     np.savez_compressed(npz_path, **updated_data)
-
