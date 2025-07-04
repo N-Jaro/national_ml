@@ -1,3 +1,4 @@
+
 import os
 import numpy as np
 import geopandas as gpd
@@ -5,9 +6,11 @@ import pandas as pd
 import rasterio
 from rasterio import features
 from rasterio.windows import from_bounds
+from rasterio.enums import Resampling
 from pysheds.grid import Grid
 from tqdm import tqdm
 from config import Settings
+import concurrent.futures # Import for parallel processing
 
 class LocalReferenceProcessor:
     """
@@ -163,11 +166,44 @@ class LocalReferenceProcessor:
         with rasterio.open(output_path, 'w', **meta) as dst:
             dst.write(mask, 1)
 
+    def _update_single_patch_file(self, args):
+        """
+        Worker function to update a single .npz file with reference data patches.
+        """
+        npz_path, template_tif_path, flow_dir_path, hydro_mask_path = args
+        
+        try:
+            # Use the patch template to define the window to read
+            with rasterio.open(template_tif_path) as template_src:
+                bounds = template_src.bounds
+            
+            output_shape = (self.settings.PATCH_SIZE, self.settings.PATCH_SIZE)
+            
+            # Read the corresponding window from the large reference rasters
+            with rasterio.open(flow_dir_path) as flow_src:
+                flow_window = from_bounds(*bounds, transform=flow_src.transform)
+                flow_dir_patch = flow_src.read(1, window=flow_window, out_shape=output_shape, resampling=Resampling.nearest)
+            
+            with rasterio.open(hydro_mask_path) as hydro_src:
+                hydro_window = from_bounds(*bounds, transform=hydro_src.transform)
+                hydro_mask_patch = hydro_src.read(1, window=hydro_window, out_shape=output_shape, resampling=Resampling.nearest)
+            
+            # Update the .npz file
+            with np.load(npz_path) as existing_data:
+                updated_data = {key: existing_data[key] for key in existing_data}
+            
+            updated_data['flow_dir'] = flow_dir_patch
+            updated_data['hydro_mask'] = hydro_mask_patch
+            np.savez_compressed(npz_path, **updated_data)
+            return True
+        except Exception as e:
+            # print(f"Skipping {os.path.basename(npz_path)}: could not process. Reason: {e}")
+            return False
 
     def run(self):
         """
         Iterates through HUC folders, generates full reference rasters,
-        then extracts patches and updates the .npz files.
+        then extracts patches and updates the .npz files in parallel.
         """
         huc_root_folder = os.path.join(self.settings.ROOT_OUTPUT_FOLDER, self.settings.HUC_OUTPUT_FOLDER)
         patch_root_folder = os.path.join(self.settings.ROOT_OUTPUT_FOLDER, self.settings.PATCH_OUTPUT_FOLDER)
@@ -180,62 +216,36 @@ class LocalReferenceProcessor:
             huc_boundary_path = os.path.join(huc_root_folder, huc_id, f'huc8_{huc_id}_boundary.geojson')
             huc_dir_patches = os.path.join(patch_root_folder, huc_id)
 
-            if not os.path.exists(huc_dem_path) or not os.path.exists(huc_boundary_path):
-                print(f"Warning: DEM or Boundary file for HUC {huc_id} not found. Skipping.")
-                continue
+            if not os.path.exists(huc_dem_path) or not os.path.exists(huc_boundary_path): continue
 
             flow_dir_path = os.path.join(huc_dir_patches, 'flow_direction.tif')
             hydro_mask_path = os.path.join(huc_dir_patches, 'hydro_mask.tif')
 
+            # 1. Create the full reference rasters for the HUC (this is sequential)
             self._calculate_d8_flow_direction(huc_dem_path, flow_dir_path)
             self._create_hydro_mask(huc_dem_path, huc_boundary_path, hydro_mask_path)
 
+            # 2. Extract patches and update .npz files in parallel
             print("    - Extracting reference patches and updating .npz files...")
-            
             if not os.path.exists(flow_dir_path) or not os.path.exists(hydro_mask_path):
                 print(f"Warning: Reference TIFs for HUC {huc_id} not created. Skipping patch update.")
                 continue
 
-            with rasterio.open(flow_dir_path) as flow_src, rasterio.open(hydro_mask_path) as hydro_src:
-                patch_files = [f for f in os.listdir(huc_dir_patches) if f.endswith('.npz')]
-                for patch_file_name in patch_files:
-                    npz_path = os.path.join(huc_dir_patches, patch_file_name)
-                    patch_index = patch_file_name.split('_')[1].split('.')[0]
-                    template_tif_path = os.path.join(huc_dir_patches, f'patch_{patch_index}_georef_template.tif')
-                    
-                    if not os.path.exists(template_tif_path): continue
+            patch_files = [f for f in os.listdir(huc_dir_patches) if f.endswith('.npz')]
+            
+            # Create a list of arguments for the worker function
+            tasks_args = []
+            for patch_file_name in patch_files:
+                npz_path = os.path.join(huc_dir_patches, patch_file_name)
+                patch_index = patch_file_name.split('_')[1].split('.')[0]
+                template_tif_path = os.path.join(huc_dir_patches, f'patch_{patch_index}_georef_template.tif')
+                if os.path.exists(template_tif_path):
+                    tasks_args.append((npz_path, template_tif_path, flow_dir_path, hydro_mask_path))
 
-                    with rasterio.open(template_tif_path) as template_src:
-                        bounds = template_src.bounds
-                        
-                        # Calculate the window for the large source rasters
-                        flow_window = from_bounds(*bounds, transform=flow_src.transform)
-                        hydro_window = from_bounds(*bounds, transform=hydro_src.transform)
-
-                        # Define the desired output shape from settings
-                        output_shape = (self.settings.PATCH_SIZE, self.settings.PATCH_SIZE)
-
-                        # Read data, forcing the output to the exact patch size using nearest neighbor resampling
-                        flow_dir_patch = flow_src.read(
-                            1,
-                            window=flow_window,
-                            out_shape=output_shape,
-                            resampling=Resampling.nearest
-                        )
-                        hydro_mask_patch = hydro_src.read(
-                            1,
-                            window=hydro_window,
-                            out_shape=output_shape,
-                            resampling=Resampling.nearest
-                        )
-
-                    try:
-                        with np.load(npz_path) as existing_data:
-                            updated_data = {key: existing_data[key] for key in existing_data}
-                    except Exception as e:
-                        print(f"Skipping {npz_path}: could not load .npz file. Reason: {e}")
-                        continue
-                    
-                    updated_data['flow_dir'] = flow_dir_patch
-                    updated_data['hydro_mask'] = hydro_mask_patch
-                    np.savez_compressed(npz_path, **updated_data)
+            # Use a ThreadPoolExecutor to process patches concurrently
+            MAX_WORKERS = 16
+            with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                results = list(tqdm(executor.map(self._update_single_patch_file, tasks_args), total=len(tasks_args), desc=f"  Updating .npz for HUC {huc_id}", leave=False))
+            
+            success_count = sum(1 for r in results if r)
+            print(f"    - Update complete. {success_count}/{len(tasks_args)} patches updated.")

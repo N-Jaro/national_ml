@@ -6,13 +6,20 @@ class Settings:
                 
         # --- Stage 1: HUC Processing Parameters ---
         self.HUC_IDS_TO_PROCESS = [
-            '10020007', # Lake Washington/Cedar/Sammamish
-            # '10190005', # Upper Yellowstone
-            # '07080104'  # Upper Illinois
+            '03160113', '19090102', '17090011', '03040206', '18070103',
+            '12090302', '14010005', '10260010', '19050105', '05040003',
+            '17100206', '11020004', '19020504', '19050401', '03050108',
+            '10170204', '07140202', '12070101', '10120203', '18020151',
+            '12090202', '07040006', '05080002', '18020126', '08020205',
+            '18020111', '13060003', '18070107', '07130003', '17110012',
+            '03030005', '04060102', '17010203', '14060004', '19080302',
+            '07130004', '19080204', '10270104', '12090104', '13070007',
+            '03160106', '07030005', '05090104', '13040209', '17060109',
+            '16040204', '08020301', '10130306', '18080003', '07120005'
         ]
         
         # --- File and Folder Paths ---
-        self.ROOT_OUTPUT_FOLDER = 'pipeline_output'
+        self.ROOT_OUTPUT_FOLDER = '/u/nathanj/national_ml/data/processed' # Root folder for all outputs
         self.HUC_OUTPUT_FOLDER = 'huc_processing' # Subfolder for Stage 1
         self.PATCH_OUTPUT_FOLDER = 'patch_dataset' # Subfolder for Stage 2
         
