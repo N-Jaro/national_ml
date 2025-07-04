@@ -205,17 +205,29 @@ class LocalReferenceProcessor:
                     
                     if not os.path.exists(template_tif_path): continue
 
-                    # THE FIX: Use the patch template's bounds but the HUC raster's transform
                     with rasterio.open(template_tif_path) as template_src:
                         bounds = template_src.bounds
-                        # Calculate the window for the large flow direction raster
+                        
+                        # Calculate the window for the large source rasters
                         flow_window = from_bounds(*bounds, transform=flow_src.transform)
-                        # Calculate the window for the large hydro mask raster
                         hydro_window = from_bounds(*bounds, transform=hydro_src.transform)
 
-                        # Read the data from the correct window
-                        flow_dir_patch = flow_src.read(1, window=flow_window)
-                        hydro_mask_patch = hydro_src.read(1, window=hydro_window)
+                        # Define the desired output shape from settings
+                        output_shape = (self.settings.PATCH_SIZE, self.settings.PATCH_SIZE)
+
+                        # Read data, forcing the output to the exact patch size using nearest neighbor resampling
+                        flow_dir_patch = flow_src.read(
+                            1,
+                            window=flow_window,
+                            out_shape=output_shape,
+                            resampling=Resampling.nearest
+                        )
+                        hydro_mask_patch = hydro_src.read(
+                            1,
+                            window=hydro_window,
+                            out_shape=output_shape,
+                            resampling=Resampling.nearest
+                        )
 
                     try:
                         with np.load(npz_path) as existing_data:

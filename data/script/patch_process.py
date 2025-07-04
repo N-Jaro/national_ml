@@ -31,10 +31,12 @@ class PatchProcessor:
         except Exception:
             pass
 
-    def _fetch_patch_as_geotiff_content(self, image: ee.Image, center_point: ee.Feature, scale: float) -> bytes:
+    def _fetch_patch_as_geotiff_content(self, image: ee.Image, center_point: ee.Feature, scale: float, crs: str) -> bytes:
         """
-        Fetches a single patch and returns the raw GeoTIFF file content as bytes.
+        Fetches a single patch and returns the raw GeoTIFF file content as bytes,
+        ensuring it is in the specified CRS.
         """
+        # The image is already reprojected, but we calculate the patch area in its projection
         image_proj = image.projection()
         patch_radius_meters = self.settings.PATCH_SIZE * scale / 2.0
         patch_area = center_point.geometry().transform(image_proj, 1).buffer(patch_radius_meters, 1).bounds(1, image_proj)
@@ -43,7 +45,8 @@ class PatchProcessor:
             url = image.getDownloadURL({
                 'region': patch_area,
                 'dimensions': f'{self.settings.PATCH_SIZE}x{self.settings.PATCH_SIZE}',
-                'format': 'GEO_TIFF'
+                'format': 'GEO_TIFF',
+                'crs': crs # Explicitly set the CRS for the output GeoTIFF
             })
             response = requests.get(url)
             response.raise_for_status()
@@ -76,12 +79,13 @@ class PatchProcessor:
         Worker function to fetch all data layers for one patch and save it.
         """
         i, center_feature, gee_images = args
+        target_crs = self.settings.TARGET_DEM_CRS
         try:
-            # Fetch raw GeoTIFF content first
-            dem_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['dem'], center_feature, self.settings.SOURCE_RESOLUTIONS['dem'])
-            optical_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['optical'], center_feature, self.settings.SOURCE_RESOLUTIONS['optical'])
-            thermal_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['thermal'], center_feature, self.settings.SOURCE_RESOLUTIONS['thermal'])
-            sar_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['sar'], center_feature, self.settings.SOURCE_RESOLUTIONS['sar'])
+            # Fetch raw GeoTIFF content first, ensuring the correct CRS
+            dem_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['dem'], center_feature, self.settings.SOURCE_RESOLUTIONS['dem'], target_crs)
+            optical_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['optical'], center_feature, self.settings.SOURCE_RESOLUTIONS['optical'], target_crs)
+            thermal_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['thermal'], center_feature, self.settings.SOURCE_RESOLUTIONS['thermal'], target_crs)
+            sar_tiff_content = self._fetch_patch_as_geotiff_content(gee_images['sar'], center_feature, self.settings.SOURCE_RESOLUTIONS['sar'], target_crs)
 
             patch_data = {}
             if dem_tiff_content:
@@ -91,7 +95,12 @@ class PatchProcessor:
                     f.write(dem_tiff_content)
             
             if optical_tiff_content:
-                patch_data['optical'] = tifffile.imread(io.BytesIO(optical_tiff_content))
+                # Transpose optical data if necessary
+                optical_array = tifffile.imread(io.BytesIO(optical_tiff_content))
+                if optical_array.ndim == 3 and optical_array.shape[0] < optical_array.shape[1]:
+                    optical_array = np.transpose(optical_array, (1, 2, 0))
+                patch_data['optical'] = optical_array
+
             if thermal_tiff_content:
                 patch_data['thermal'] = tifffile.imread(io.BytesIO(thermal_tiff_content))
             if sar_tiff_content:
@@ -112,11 +121,21 @@ class PatchProcessor:
         aoi_for_composites = ee.FeatureCollection(center_point_features).geometry().buffer(10000)
 
         print("  Preparing GEE image composites...")
-        dem_image = ee.Image(self.settings.DEM_SOURCE_IMG_NAME).select('elevation')
+        dem_image_raw = ee.Image(self.settings.DEM_SOURCE_IMG_NAME).select('elevation')
         landsat_composites = self._get_landsat_composite(aoi_for_composites)
-        optical_image = landsat_composites['optical']
-        thermal_image = landsat_composites['thermal']
-        sar_image = self._get_sar_composite(aoi_for_composites)
+        optical_image_raw = landsat_composites['optical']
+        thermal_image_raw = landsat_composites['thermal']
+        sar_image_raw = self._get_sar_composite(aoi_for_composites)
+        
+        # --- THE FIX: Reproject all source images to the target CRS ---
+        target_crs = self.settings.TARGET_DEM_CRS
+        print(f"  Reprojecting all source images to {target_crs}...")
+        
+        dem_image = dem_image_raw.reproject(crs=target_crs, scale=self.settings.SOURCE_RESOLUTIONS['dem'])
+        optical_image = optical_image_raw.reproject(crs=target_crs, scale=self.settings.SOURCE_RESOLUTIONS['optical'])
+        thermal_image = thermal_image_raw.reproject(crs=target_crs, scale=self.settings.SOURCE_RESOLUTIONS['thermal'])
+        sar_image = sar_image_raw.reproject(crs=target_crs, scale=self.settings.SOURCE_RESOLUTIONS['sar'])
+
         print("  Image preparation complete.")
         
         os.makedirs(self.output_folder, exist_ok=True)
