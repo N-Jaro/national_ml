@@ -11,8 +11,9 @@ class HUCProcessor:
     Processes HUC8 watersheds to generate patch center points and export
     the full HUC DEM for local processing.
     """
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, huc_ids_to_process: list):
         self.settings = settings
+        self.huc_ids_to_process = huc_ids_to_process # <-- Use the passed list
         self.all_tasks = [] 
         self._initialize_gee()
         self.HUC8_COL = ee.FeatureCollection(settings.HUC8_COL_NAME)
@@ -187,7 +188,7 @@ class HUCProcessor:
         """
         Executes the entire workflow for the HUCs defined in settings.
         """
-        for huc_id in self.settings.HUC_IDS_TO_PROCESS:
+        for huc_id in self.huc_ids_to_process:
             self._process_single_huc(huc_id)
             
         if not self.all_tasks:

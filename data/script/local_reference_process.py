@@ -17,7 +17,7 @@ class LocalReferenceProcessor:
     Processes local data to create hydrography and flow direction reference layers
     that perfectly align with previously downloaded GEE patches.
     """
-    def __init__(self, settings: Settings, nhd_gdb_path: str):
+    def __init__(self, settings: Settings, nhd_gdb_path: str, huc_ids_to_process: list):
         """
         Initializes the processor.
 
@@ -27,6 +27,7 @@ class LocalReferenceProcessor:
         """
         self.settings = settings
         self.nhd_gdb_path = nhd_gdb_path
+        self.huc_ids_to_process = huc_ids_to_process
         print("NHD GeoDatabase path has been set.")
 
     def _calculate_d8_flow_direction(self, dem_path: str, output_path: str):
@@ -207,11 +208,11 @@ class LocalReferenceProcessor:
         """
         huc_root_folder = os.path.join(self.settings.ROOT_OUTPUT_FOLDER, self.settings.HUC_OUTPUT_FOLDER)
         patch_root_folder = os.path.join(self.settings.ROOT_OUTPUT_FOLDER, self.settings.PATCH_OUTPUT_FOLDER)
-        huc_folders = [d for d in os.listdir(huc_root_folder) if os.path.isdir(os.path.join(huc_root_folder, d))]
+        # huc_folders = [d for d in os.listdir(huc_root_folder) if os.path.isdir(os.path.join(huc_root_folder, d))]
 
-        print(f"\nFound {len(huc_folders)} HUC folders to process for local reference layers.")
+        # print(f"\nFound {len(huc_folders)} HUC folders to process for local reference layers.")
 
-        for huc_id in tqdm(huc_folders, desc="Processing HUCs Locally"):
+        for huc_id in tqdm(self.huc_ids_to_process, desc="Processing HUCs Locally"):
             huc_dem_path = os.path.join(huc_root_folder, huc_id, f'huc8_{huc_id}_dem.tif')
             huc_boundary_path = os.path.join(huc_root_folder, huc_id, f'huc8_{huc_id}_boundary.geojson')
             huc_dir_patches = os.path.join(patch_root_folder, huc_id)

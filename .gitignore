@@ -64,3 +64,4 @@ slurm-*.out
 *.geojson
 *.json
 
+data/script/slurm_logs/
