@@ -63,5 +63,6 @@ slurm-*.out
 *credentials.json
 *.geojson
 *.json
+*.sqlite
 
 data/script/slurm_logs/
