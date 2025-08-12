@@ -97,6 +97,7 @@ class HierarchicalAttentionFusion(nn.Module):
     Fuses features hierarchically. The primary modality's feature is used to
     generate attention maps for the other modalities, guiding the fusion process.
     """
+    
     def __init__(self, primary_channels, other_channels_list, fused_channels):
         super().__init__()
         self.primary_channels = primary_channels
