@@ -1,57 +1,93 @@
-# run_lightning_train.py
-import torch
-torch.set_float32_matmul_precision("high")
-
+import os
 import argparse
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.loggers import WandbLogger
 
 from train_mdmt_lightning import MDMTLitModule
 from data_module import PatchDataModule
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_path", type=str, required=True,
-                        help="Root folder with HUC_code subfolders containing patch_*.npz")
-    parser.add_argument("--hucs", type=str, default="03030005",
-                        help="Comma-separated HUC codes, e.g., 03030005,03030006")
+    parser.add_argument("--base_path", type=str, required=True)
+    parser.add_argument("--hucs", type=str, required=True, help="One or more HUC codes, comma-separated (e.g. 03030005,03040206,03050108)")
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--patience", type=float, default=15)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--val_split", type=float, default=0.1)
-    parser.add_argument("--precision", type=str, default="32", choices=["16", "32", "64", "bf16"])
+    parser.add_argument("--precision", type=str, default="16", choices=["16", "32", "64", "bf16"])
+    parser.add_argument("--water_loss_scale", type=float, default=1.0, help="Scale factor for water (task1) loss (default: 1.0)")
+    parser.add_argument("--d8_loss_scale", type=float, default=0.5, help="Scale factor for D8 (task2) loss (default: 0.5)")
+    parser.add_argument("--no_dynamic_weighter", action="store_true", help="Disable uncertainty-based dynamic loss weighting")
+
+    # --- W&B flags ---
+    parser.add_argument("--wandb_project", type=str, default="mdmt-hydro")
+    parser.add_argument("--wandb_run", type=str, default=None)  # None -> auto name
+    parser.add_argument("--wandb_mode", type=str, default="online", choices=["online", "offline", "disabled"])
+    parser.add_argument("--wandb_dir", type=str, default="./lightning_logs")  # where to store run files on disk
+
     args = parser.parse_args()
 
-    huc_list = [h.strip() for h in args.hucs.split(",") if h.strip()]
+    # Use tensor cores effectively on H100
+    torch.set_float32_matmul_precision("high")
 
-    # Data
+    # Prepare data
+    huc_list = [h.strip() for h in args.hucs.split(",") if h.strip()]
     dm = PatchDataModule(
         base_path=args.base_path,
         huc_list=huc_list,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        val_split=args.val_split
+        val_split=args.val_split,
     )
+    # compute stats (pos_weight & class weights) before creating the module
+    dm.setup()
 
     # Model
-    lit = MDMTLitModule(lr=args.lr)
+    lit = MDMTLitModule(
+        lr=args.lr,
+        water_pos_weight=dm.water_pos_weight,
+        d8_class_weights=dm.d8_class_weights,
+        d8_label_smoothing=0.05,
+        # <<< new knobs >>>
+        water_loss_scale=args.water_loss_scale,
+        d8_loss_scale=args.d8_loss_scale,
+        use_dynamic_weighter=not args.no_dynamic_weighter,
+    )
+
+    # --- W&B logger ---
+    os.makedirs(args.wandb_dir, exist_ok=True)
+    os.environ["WANDB_DIR"] = os.path.abspath(args.wandb_dir)
+
+    wandb_logger = WandbLogger(
+        project=args.wandb_project,
+        name=args.wandb_run,
+        mode=args.wandb_mode,       # "offline" works well on HPC; later: `wandb sync ./lightning_logs`
+        save_dir=args.wandb_dir,
+        log_model=False,            # set True if you want checkpoint upload
+    )
+    # save CLI args to the run config
+    wandb_logger.experiment.config.update(vars(args))
 
     # Callbacks
     ckpt = ModelCheckpoint(
+        dirpath=os.path.join(args.wandb_dir, "checkpoints"),
+        filename="mdmt-{epoch:02d}-{val_loss:.4f}",
         monitor="val_loss",
         mode="min",
-        save_top_k=3,
-        filename="mdmt-{epoch:02d}-{val_loss:.4f}"
+        save_top_k=3
     )
-    es = EarlyStopping(monitor="val_loss", mode="min", patience=5)
+    es = EarlyStopping(monitor="val_loss", mode="min", patience=args.patience, verbose=True)
 
     trainer = pl.Trainer(
         max_epochs=args.epochs,
         accelerator="auto",
-        devices=1,                  # use 1 GPU; set "auto" or 2+ if you want DDP
+        devices=1,                  # set to "auto" or an int>1 for multi-GPU
         precision=args.precision,   # "16", "32", "bf16"
-        logger=False,               # <— disable TB logger
+        logger=wandb_logger,        # <--- W&B is active
         log_every_n_steps=10,
         callbacks=[ckpt, es],
     )
