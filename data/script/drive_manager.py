@@ -18,15 +18,28 @@ class GoogleDriveManager:
     
     def _authenticate(self):
         creds = None
-        SCOPES = ['https://www.googleapis.com/auth/drive']
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        SCOPES = self.settings.GDRIVE_SCOPES
+        
+        # Use the credential files specified in settings
+        token_file = self.settings.GDRIVE_TOKEN_FILE
+        credentials_file = self.settings.GDRIVE_CREDENTIALS_FILE
+        
+        if os.path.exists(token_file):
+            creds = Credentials.from_authorized_user_file(token_file, SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
+                try:
+                    creds.refresh(Request())
+                except Exception as e:
+                    print(f"Token refresh failed: {e}")
+                    # Delete invalid token and re-authenticate
+                    if os.path.exists(token_file):
+                        os.remove(token_file)
+                    creds = None
+            
+            if not creds:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    self.settings.GDRIVE_CREDENTIALS_FILE,
+                    credentials_file,
                     scopes=SCOPES,
                     redirect_uri='urn:ietf:wg:oauth:2.0:oob'
                 )
@@ -38,8 +51,8 @@ class GoogleDriveManager:
                 creds = flow.credentials
 
                 # Save the token for future use
-                with open('token.json', 'w') as token_file:
-                    token_file.write(creds.to_json())
+                with open(token_file, 'w') as token_file_handle:
+                    token_file_handle.write(creds.to_json())
         
         try:
             service = build('drive', 'v3', credentials=creds)

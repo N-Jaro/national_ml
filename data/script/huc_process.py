@@ -17,7 +17,12 @@ class HUCProcessor:
         self.all_tasks = [] 
         self._initialize_gee()
         self.HUC8_COL = ee.FeatureCollection(settings.HUC8_COL_NAME)
-        self.DEM_SOURCE_IMG = ee.Image(settings.DEM_SOURCE_IMG_NAME)
+        
+        # --- MODIFIED: Use ImageCollection and mosaic it ---
+        dem_collection = ee.ImageCollection(settings.DEM_SOURCE_IMG_NAME)
+        self.DEM_SOURCE_IMG = dem_collection.mosaic()
+        # --- END MODIFICATION ---
+        
         print("Creating master grid reference in target projection...")
         self.grid_reference_image = self.DEM_SOURCE_IMG.reproject(
             crs=self.settings.TARGET_DEM_CRS,

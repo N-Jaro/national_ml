@@ -28,28 +28,30 @@ class Settings:
         self.START_DATE = '2023-01-01'
         self.END_DATE = '2024-12-31'
         
-        self.DRIVE_FOLDER = 'GEE_HUC_Exports_Python_Full'  # Google Drive folder name for exports
-        self.LOCAL_DOWNLOAD_DIR = 'gee_downloads' # download directory for GEE exports
+        self.DRIVE_FOLDER = 'GEE_HUC_Exports_Python_Full_alphaE'  # Google Drive folder name for exports
+        self.LOCAL_DOWNLOAD_DIR = 'gee_downloads_alphaE' # download directory for GEE exports
         self.EXPORT_VECTOR_FORMAT = 'GeoJSON'  # export vector format, can be 'GeoJSON' or 'KML'
         self.TARGET_DEM_CRS = 'EPSG:5070' #This is the meter as the native unit # target CRS for DEM exports
-        self.GDRIVE_CREDENTIALS_FILE = 'credentials.json' # Google Drive API credentials file
-        self.GDRIVE_TOKEN_FILE = 'token.json'  # Google Drive API token file
+        self.GDRIVE_CREDENTIALS_FILE = 'GD_credentials.json' # Google Drive API credentials file
+        self.GDRIVE_TOKEN_FILE = 'GD_token.json'  # Google Drive API token file
         self.GEE_PROJECT_ID = 'nathanj-national-ml'  # GEE project ID for exports
         self.GDRIVE_SCOPES = ['https://www.googleapis.com/auth/drive']  # Google Drive API scopes
 
         # data 
         self.HUC8_COL_NAME = 'USGS/WBD/2017/HUC08' #ee.FeatureCollection('USGS/WBD/2017/HUC08')
         self.MERIT_HYDRO_IMG_NAME = 'MERIT/Hydro/v1_0_1' #ee.Image('MERIT/Hydro/v1_0_1')
-        self.DEM_SOURCE_IMG_NAME ='USGS/3DEP/10m'
+        self.DEM_SOURCE_IMG_NAME ='USGS/3DEP/10m_collection' # USGS/3DEP/10m has been deprecated, use USGS/3DEP/10m_collection instead
+        self.ALPHA_EARTH_YEAR = 2024
         
         self.SOURCE_RESOLUTIONS = {
             'dem': 10,        # USGS 3DEP DEM is 10m
             'optical': 30,    # Landsat 8/9 optical bands are 30m
             'thermal': 30,    # Landsat 8/9 thermal is resampled to 30m in C2
             'sar': 10,        # Sentinel-1 GRD is processed to 10m
-            'flow': 30,      # MERIT Hydro flow direction is 30m
-            'slope': 30,      # Slope is derived from DEM at 30m resolution
-            'aspect': 30      # Aspect is derived from DEM at 30m
+            'alphaearth': 10, # AlphaEarth data is at 10-meter resolution
+            # 'flow': 30,      # MERIT Hydro flow direction is 30m
+            # 'slope': 30,      # Slope is derived from DEM at 30m resolution
+            # 'aspect': 30      # Aspect is derived from DEM at 30m
         }
         
         # patches
@@ -57,6 +59,22 @@ class Settings:
         self.PATCH_SIZE = 224
         self.PATCH_STRIDE = 224
         self.BATCH_EXPORT_SIZE = 500
+        
+        # GEE Optimization settings
+        self.MAX_CONCURRENT_DOWNLOADS = 5  # Limit concurrent downloads
+        self.REQUEST_DELAY_SECONDS = 1.0   # Delay between requests
+        self.USE_BATCH_EXPORTS = True      # Use GEE batch exports instead of direct downloads
+        self.PATCHES_PER_EXPORT = 100      # Number of patches per batch export
+        self.MAX_PIXELS_PER_EXPORT = 1e8   # Limit pixels per export task
+        
+        # Memory management for statistics
+        self.ENABLE_STATS_CALCULATION = True   # Set to False to skip stats entirely
+        self.USE_SAMPLING_STATS = False        # Force use of sampling approach
+        self.STATS_MEMORY_CONSERVATIVE = True  # Use aggressive memory optimization
+        
+        # Data source configuration
+        self.ENABLE_ALPHAEARTH = False          # Set to False to skip AlphaEarth processing
+        self.ALPHAEARTH_BANDS_LIMIT = 64       # Use all 64 AlphaEarth embedding bands
         
         self.VISUALIZE_POINTS = True  # whether to visualize points on the map
         

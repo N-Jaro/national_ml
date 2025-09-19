@@ -115,15 +115,13 @@ class LocalReferenceProcessor:
         
         huc8_geo = gpd.read_file(huc_boundary_path)
         
-        # THE FIX: Perform the initial bounding box query in the NHD's native CRS.
-        # We assume NHD GDB is in a geographic CRS like EPSG:4269 or WGS84 (EPSG:4326)
-        # First, get the HUC bounds in a geographic CRS
+        # Get the HUC bounds in a geographic CRS
         huc8_geographic = huc8_geo.to_crs("EPSG:4269")
         bbox_geographic = tuple(huc8_geographic.total_bounds)
 
-        # Step 2: Read & clip NHD layers from the GeoDatabase
+        # Step 2: Read & clip NHD layers, buffering only the flowlines
         layers_to_read = ["NetworkNHDFlowline", "NHDWaterbody", "NonNetworkNHDFlowline"] 
-        combined_gdfs = []
+        combined_features = []
 
         for layer in layers_to_read:
             print(f"      - Reading and clipping {layer}...")
@@ -132,29 +130,36 @@ class LocalReferenceProcessor:
                 gdf = gpd.read_file(self.nhd_gdb_path, layer=layer, bbox=bbox_geographic)
                 # Clip precisely to the geographic HUC geometry
                 gdf_clipped = gdf[gdf.intersects(huc8_geographic.unary_union)]
+
                 if not gdf_clipped.empty:
-                    combined_gdfs.append(gdf_clipped)
+                    # Reproject to the DEM's CRS
+                    gdf_reproj = gdf_clipped.to_crs(raster_crs)
+
+                    # Check for flowline layers and buffer them
+                    if 'flowline' in layer.lower():
+                        print(f"      - Buffering {layer} by 15m...")
+                        buffered_gdf = gdf_reproj.buffer(15)
+                        # Create a new GeoDataFrame to store the buffered geometries
+                        combined_features.append(gpd.GeoDataFrame(geometry=buffered_gdf, crs=raster_crs))
+                    else:
+                        # Append unbuffered features as-is
+                        combined_features.append(gdf_reproj)
+                        
             except Exception as e:
                 print(f"        - Could not read or clip layer '{layer}'. It may not exist for this region. Error: {e}")
 
-        if not combined_gdfs:
+        if not combined_features:
             print("      - No NHD features found in the HUC boundary. Creating empty mask.")
             mask = np.zeros(raster_shape, dtype=np.uint8)
         else:
-            # Step 3: Combine, Reproject, and Buffer
-            print("      - Combining layers...")
-            # The CRS of the concatenated GDF will be the CRS of the source GDB data
-            combined_gdf = gpd.GeoDataFrame(pd.concat(combined_gdfs, ignore_index=True), crs=gdf.crs)
-            
-            print("      - Reprojecting to match DEM and buffering 15m...")
-            # Reproject to match the raster's CRS *before* buffering in meters
-            combined_gdf_reproj = combined_gdf.to_crs(raster_crs)
-            buffered = combined_gdf_reproj.buffer(15)
+            # Step 3: Concatenate all features (buffered and unbuffered)
+            print("      - Combining all features for rasterization...")
+            final_gdf = gpd.GeoDataFrame(pd.concat(combined_features, ignore_index=True), crs=raster_crs)
 
             # Step 4: Rasterize
             print("      - Rasterizing buffered features...")
             mask = features.rasterize(
-                ((geom, 1) for geom in buffered if geom is not None and geom.is_valid),
+                ((geom, 1) for geom in final_gdf.geometry if geom is not None and geom.is_valid),
                 out_shape=raster_shape,
                 transform=raster_transform,
                 fill=0,
