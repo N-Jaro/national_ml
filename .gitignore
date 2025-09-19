@@ -64,5 +64,7 @@ slurm-*.out
 *.geojson
 *.json
 *.sqlite
+*.out
+*.placeholder
 
 data/script/slurm_logs/
