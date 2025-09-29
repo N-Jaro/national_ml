@@ -19,7 +19,7 @@ class Settings:
         ]
         
         # --- File and Folder Paths ---
-        self.ROOT_OUTPUT_FOLDER = '/u/nathanj/national_ml/data/processed' # Root folder for all outputs
+        self.ROOT_OUTPUT_FOLDER = '/u/nathanj/national_ml/data/processed/test' # Root folder for all outputs
         self.HUC_OUTPUT_FOLDER = 'huc_processing' # Subfolder for Stage 1
         self.PATCH_OUTPUT_FOLDER = 'patch_dataset' # Subfolder for Stage 2
         
@@ -73,7 +73,7 @@ class Settings:
         self.STATS_MEMORY_CONSERVATIVE = True  # Use aggressive memory optimization
         
         # Data source configuration
-        self.ENABLE_ALPHAEARTH = False          # Set to False to skip AlphaEarth processing
+        self.ENABLE_ALPHAEARTH = True          # Set to False to skip AlphaEarth processing
         self.ALPHAEARTH_BANDS_LIMIT = 64       # Use all 64 AlphaEarth embedding bands
         
         self.VISUALIZE_POINTS = True  # whether to visualize points on the map
