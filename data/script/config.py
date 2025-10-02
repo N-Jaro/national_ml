@@ -19,7 +19,7 @@ class Settings:
         ]
         
         # --- File and Folder Paths ---
-        self.ROOT_OUTPUT_FOLDER = '/u/nathanj/national_ml/data/processed/test' # Root folder for all outputs
+        self.ROOT_OUTPUT_FOLDER = '/projects/bcrm/nathanj/data/processed/test' # Root folder for all outputs
         self.HUC_OUTPUT_FOLDER = 'huc_processing' # Subfolder for Stage 1
         self.PATCH_OUTPUT_FOLDER = 'patch_dataset' # Subfolder for Stage 2
         

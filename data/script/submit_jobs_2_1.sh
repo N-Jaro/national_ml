@@ -32,7 +32,7 @@
 mkdir -p slurm_logs
 
 # Define the file containing the list of HUC IDs
-HUC_LIST_FILE="test_huc_list_3_padded.txt"
+HUC_LIST_FILE="test_huc_list_2_padded_1.txt"
 
 # Get the specific HUC ID for this job from the Slurm array index
 HUC_ID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$HUC_LIST_FILE")

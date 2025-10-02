@@ -181,8 +181,8 @@ class PatchProcessor:
         # Add 'alphaearth' to the gee_images dictionary
         gee_images = {'dem': dem_image, 'optical': optical_image, 'thermal': thermal_image, 'sar': sar_image, 'alphaearth': alphaearth_image}
         tasks_args = [(i, center_feature, gee_images) for i, center_feature in enumerate(center_point_features)]
-        
-        MAX_WORKERS = 16
+
+        MAX_WORKERS = min(8, os.cpu_count() or 1)
         print(f"  Fetching {len(tasks_args)} patches with up to {MAX_WORKERS} parallel workers...")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:

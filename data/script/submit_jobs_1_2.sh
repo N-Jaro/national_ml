@@ -23,16 +23,16 @@
 #SBATCH --nodes=1                  # Run all processes on a single node
 #SBATCH --ntasks=1                 # Run a single task
 #SBATCH --cpus-per-task=16         # Number of CPU cores per task
-#SBATCH --mem=50G                  # Job memory request (e.g., 32GB)
-#SBATCH --time=06:00:00            # Time limit hrs:min:sec
+#SBATCH --mem=100G                  # Job memory request (e.g., 32GB)
+#SBATCH --time=12:00:00            # Time limit hrs:min:sec
 
 # --- Script Logic ---
 
 # Create the log directory if it doesn't exist
-mkdir -p slurm_logs_1
+mkdir -p slurm_logs
 
 # Define the file containing the list of HUC IDs
-HUC_LIST_FILE="test_huc_list_1_padded.txt"
+HUC_LIST_FILE="test_huc_list_1_padded_2.txt"
 
 # Get the specific HUC ID for this job from the Slurm array index
 HUC_ID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$HUC_LIST_FILE")
