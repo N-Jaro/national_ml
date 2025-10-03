@@ -1,5 +1,4 @@
 import os
-import glob
 import pandas as pd
 import argparse # <-- Import for command-line arguments
 from config import Settings
@@ -23,41 +22,12 @@ def run_pipeline(huc_ids_to_process: list):
     huc_root_folder = os.path.join(settings.ROOT_OUTPUT_FOLDER, settings.HUC_OUTPUT_FOLDER)
     patch_root_folder = os.path.join(settings.ROOT_OUTPUT_FOLDER, settings.PATCH_OUTPUT_FOLDER)
 
-    # Check if all required output files already exist for the specified HUC IDs
-    def check_huc_complete(huc_id):
-        huc_folder = os.path.join(huc_root_folder, huc_id)
-        if not os.path.exists(huc_folder):
-            return False
-        required_files = [
-            f'huc8_{huc_id}_boundary.geojson',
-            f'huc8_{huc_id}_center_points.csv',
-            f'huc8_{huc_id}_center_points_features.geojson',
-            f'huc8_{huc_id}_dem.tif'
-        ]
-        return all(os.path.exists(os.path.join(huc_folder, f)) and os.path.getsize(os.path.join(huc_folder, f)) > 0 for f in required_files)
-    
-    def check_patch_complete(huc_id):
-        patch_folder = os.path.join(patch_root_folder, huc_id)
-        if not os.path.exists(patch_folder):
-            return False
-        # Check for normalization stats, at least 5 patch files, and flow/hydro files
-        stats_file = os.path.join(patch_folder, 'normalization_stats.json')
-        flow_file = os.path.join(patch_folder, 'flow_direction.tif')
-        hydro_file = os.path.join(patch_folder, 'hydro_mask.tif')
-        
-        import glob
-        patch_files = glob.glob(os.path.join(patch_folder, 'patch_*.npz'))
-        
-        return (os.path.exists(stats_file) and os.path.getsize(stats_file) > 0 and
-                os.path.exists(flow_file) and os.path.getsize(flow_file) > 0 and
-                os.path.exists(hydro_file) and os.path.getsize(hydro_file) > 0 and
-                len(patch_files) >= 5)
-    
-    all_huc_complete = all(check_huc_complete(huc_id) for huc_id in huc_ids_to_process)
-    all_patch_complete = all(check_patch_complete(huc_id) for huc_id in huc_ids_to_process)
+    # Check if all required folders already exist for the specified HUC IDs
+    all_huc_folders_exist = all(os.path.exists(os.path.join(huc_root_folder, huc_id)) for huc_id in huc_ids_to_process)
+    all_patch_folders_exist = all(os.path.exists(os.path.join(patch_root_folder, huc_id)) for huc_id in huc_ids_to_process)
 
-    if all_huc_complete and all_patch_complete:
-        print(f"All processing already complete for HUC(s) {huc_ids_to_process}. Skipping pipeline execution.")
+    if all_huc_folders_exist and all_patch_folders_exist:
+        print(f"All output folders already exist for HUC(s) {huc_ids_to_process}. Skipping pipeline execution.")
         print("--- PIPELINE SKIPPED ---")
         return
 
@@ -65,20 +35,18 @@ def run_pipeline(huc_ids_to_process: list):
     # ==      STAGE 1: Generate HUC Center Points                            ==
     # =========================================================================
     
-    hucs_needing_stage1 = [huc_id for huc_id in huc_ids_to_process if not check_huc_complete(huc_id)]
-    
-    if not hucs_needing_stage1:
-        print(f"--- SKIPPING STAGE 1: HUC processing already complete for all HUC(s): {huc_ids_to_process} ---")
+    if all_huc_folders_exist:
+        print(f"--- SKIPPING STAGE 1: HUC folders already exist for HUC(s): {huc_ids_to_process} ---")
     else:
-        print(f"--- STARTING STAGE 1: HUC Center Point Generation for HUC(s): {hucs_needing_stage1} ---")
+        print(f"--- STARTING STAGE 1: HUC Center Point Generation for HUC(s): {huc_ids_to_process} ---")
         # Pass the specific HUC IDs to the processor
-        huc_processor = HUCProcessor(settings=settings, huc_ids_to_process=hucs_needing_stage1)
+        huc_processor = HUCProcessor(settings=settings, huc_ids_to_process=huc_ids_to_process)
         huc_processor.run()
         
         # download and cleanup huc code bouandaries and DEMs
         print("\n--- STARTING AUTOMATED DOWNLOAD AND CLEANUP ---")
         drive_manager = GoogleDriveManager(settings=settings)
-        for huc_id in hucs_needing_stage1:
+        for huc_id in huc_ids_to_process:
             drive_manager.merge_and_download_huc_outputs(huc_id=huc_id, local_destination_path=os.path.join(huc_root_folder, huc_id))
         
         print("\n--- STAGE 1 COMPLETE ---")
@@ -87,21 +55,15 @@ def run_pipeline(huc_ids_to_process: list):
     # ==      STAGE 2: Calculate Normalization Statistics                    ==
     # =========================================================================
 
-    # Check which HUCs have complete Stage 1 outputs (required for Stage 2)
-    hucs_with_complete_stage1 = [huc_id for huc_id in huc_ids_to_process if check_huc_complete(huc_id)]
+    # Check if HUC folders exist (required for Stage 2)
+    existing_huc_folders = [huc_id for huc_id in huc_ids_to_process if os.path.exists(os.path.join(huc_root_folder, huc_id))]
     
-    if not hucs_with_complete_stage1:
-        print("\n--- SKIPPING STAGE 2: No HUC folders with complete Stage 1 outputs found ---")
+    if not existing_huc_folders:
+        print("\n--- SKIPPING STAGE 2: No HUC folders found ---")
     else:
         print("\n--- STARTING STAGE 2: Calculating Normalization Statistics ---")
         
-        for huc_id in hucs_with_complete_stage1:
-            # Check if stats already exist
-            stats_file = os.path.join(patch_root_folder, huc_id, 'normalization_stats.json')
-            if os.path.exists(stats_file) and os.path.getsize(stats_file) > 0:
-                print(f"\nSkipping stats for HUC {huc_id} - already exists")
-                continue
-                
+        for huc_id in existing_huc_folders:
             try:
                 print(f"\nProcessing stats for HUC {huc_id}...")
                 stats_processor = StatsProcessor(settings=settings, huc_id=huc_id)
@@ -115,43 +77,27 @@ def run_pipeline(huc_ids_to_process: list):
     # ==      STAGE 3: Fetch Raw Image Patches                               ==
     # =========================================================================
     
-    hucs_needing_patches = []
-    for huc_id in huc_ids_to_process:
-        if not check_huc_complete(huc_id):
-            print(f"\nSkipping patch processing for HUC {huc_id} - Stage 1 not complete")
-            continue
-            
-        # Check if patches already exist
-        patch_folder = os.path.join(patch_root_folder, huc_id)
-        import glob
-        existing_patches = glob.glob(os.path.join(patch_folder, 'patch_*.npz')) if os.path.exists(patch_folder) else []
-        
-        if len(existing_patches) >= 5:  # Assume at least 5 patches means processing is complete
-            print(f"\nSkipping patch processing for HUC {huc_id} - {len(existing_patches)} patches already exist")
-            continue
-            
-        hucs_needing_patches.append(huc_id)
-    
-    if not hucs_needing_patches:
-        print("\n--- SKIPPING STAGE 3: Patch processing already complete for all valid HUCs ---")
+    if all_patch_folders_exist:
+        print("\n--- SKIPPING STAGE 3: Patch folders already exist for all HUC(s) ---")
     else:
-        print(f"\n--- STARTING STAGE 3: Raw Patch Fetching and Processing for HUC(s): {hucs_needing_patches} ---")
+        print("\n--- STARTING STAGE 3: Raw Patch Fetching and Processing ---")
         
-        for huc_id in hucs_needing_patches:
+        for huc_id in huc_ids_to_process:
+            patch_huc_output_folder = os.path.join(patch_root_folder, huc_id)
+            if os.path.exists(patch_huc_output_folder):
+                print(f"\nSkipping patch processing for HUC {huc_id} - folder already exists")
+                continue
+                
             huc_folder_path = os.path.join(huc_root_folder, huc_id)
+            if not os.path.isdir(huc_folder_path): continue
             try:
                 csv_path = os.path.join(huc_folder_path, f'huc8_{huc_id}_center_points.csv')
-                if not os.path.exists(csv_path): 
-                    print(f"Skipping HUC {huc_id} - CSV file not found")
-                    continue
+                if not os.path.exists(csv_path): continue
                 
                 print(f"\nProcessing raw patches for HUC {huc_id}...")
                 center_points = pd.read_csv(csv_path).to_dict('records')
-                if not center_points: 
-                    print(f"No center points found for HUC {huc_id}")
-                    continue
+                if not center_points: continue
 
-                patch_huc_output_folder = os.path.join(patch_root_folder, huc_id)
                 patch_processor = PatchProcessor(
                     center_points=center_points, output_folder=patch_huc_output_folder,
                     settings=settings, huc_id=huc_id
