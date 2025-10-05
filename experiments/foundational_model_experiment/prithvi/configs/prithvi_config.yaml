@@ -1,0 +1,132 @@
+experiment:
+  name: prithvi_water_segmentation
+  description: Prithvi-100M Foundation Model Experiment for water segmentation
+  model_type: prithvi_eo_v1_100
+  paper: https://arxiv.org/abs/2310.18660
+data:
+  base_path: /u/nathanj/national_ml/data/processed/patch_dataset
+  huc_codes:
+    - "03160113"
+    - "19090102"
+    - "17090011"
+    - "03040206"
+    - "18070103"
+    - "12090302"
+    - "14010005"
+    - "10260010"
+    - "19050105"
+    - "05040003"
+    - "17100206"
+    - "11020004"
+    - "19020504"
+    - "19050401"
+    - "03050108"
+    - "10170204"
+    - "07140202"
+    - "12070101"
+    - "10120203"
+    - "18020151"
+    - "12090202"
+    - "07040006"
+    - "05080002"
+    - "18020126"
+    - "08020205"
+    - "18020111"
+    - "13060003"
+    - "18070107"
+    - "07130003"
+    - "17110012"
+    - "03030005"
+    - "04060102"
+    - "17010203"
+    - "14060004"
+    - "19080302"
+    - "07130004"
+    - "19080204"
+    - "10270104"
+    - "12090104"
+    - "13070007"
+    - "03160106"
+    - "07030005"
+    - "05090104"
+    - "13040209"
+    - "17060109"
+    - "16040204"
+    - "08020301"
+    - "10130306"
+    - "18080003"
+    - "07120005"
+  modalities:
+    - dem
+    - optical
+    - thermal
+    - sar
+  split_method: patch_level
+  split_ratio: 0.9
+  random_seed: 42
+  optical_channels: 6
+  total_channels: 9
+  image_size: 224
+  normalize_per_huc: true
+model:
+  decoder: FCNDecoder
+  pretrained: true
+  in_channels: 9
+  num_classes: 1
+  patch_size: 16
+  embed_dim: 768
+  depth: 12
+  num_heads: 12
+training:
+  optimizer: AdamW
+  learning_rate: 2.0e-05
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-08
+  max_epochs: 500
+  batch_size: 8
+  patience: 30
+  scheduler: CosineAnnealingLR
+  T_max: 500
+  eta_min: 1.0e-06
+  warmup_epochs: 20
+  gradient_clip_val: 1.0
+  dropout: 0.1
+  precision: 16-mixed
+  monitor_metric: val_loss
+  monitor_mode: min
+loss:
+  type: CombinedFocalDiceLoss
+  focal_weight: 0.7
+  dice_weight: 0.3
+  focal_alpha: 0.75
+  focal_gamma: 1.5
+logging:
+  experiment_tracking: wandb
+  project_name: prithvi_water_segmentation
+  wandb:
+    entity: null
+    tags:
+      - prithvi
+      - water_segmentation
+      - 4modal
+      - foundation_model
+    group: prithvi
+    notes: Prithvi-100M Foundation Model Experiment for water segmentation
+    log_model: true
+    watch_model: gradients
+  save_top_k: 3
+  save_last: true
+  monitor: val_loss
+  log_every_n_steps: 10
+  val_check_interval: 1.0
+output:
+  base_dir: outputs/prithvi_results
+  model_dir: models
+  figures_dir: figures
+  logs_dir: logs
+reproducibility:
+  seed: 42
+  deterministic: false
+  benchmark: true

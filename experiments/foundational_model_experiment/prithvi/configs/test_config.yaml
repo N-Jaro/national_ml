@@ -1,0 +1,84 @@
+data:
+  base_path: /u/nathanj/national_ml/data/processed/patch_dataset
+  huc_codes:
+  - '03160113'
+  - '19090102'
+  image_size: 224
+  modalities:
+  - dem
+  - optical
+  - thermal
+  - sar
+  normalize_per_huc: true
+  optical_channels: 6
+  random_seed: 42
+  split_method: patch_level
+  split_ratio: 0.9
+  total_channels: 9
+experiment:
+  description: Prithvi-100M Foundation Model Experiment for water segmentation
+  model_type: prithvi_eo_v1_100
+  name: prithvi_water_segmentation
+  paper: https://arxiv.org/abs/2310.18660
+logging:
+  experiment_tracking: wandb
+  log_every_n_steps: 10
+  monitor: val_iou
+  project_name: prithvi_water_segmentation_test
+  save_last: true
+  save_top_k: 3
+  val_check_interval: 1.0
+  wandb:
+    entity: null
+    group: prithvi
+    log_model: true
+    notes: Prithvi-100M Foundation Model Experiment for water segmentation
+    tags:
+    - prithvi
+    - water_segmentation
+    - 4modal
+    - foundation_model
+    watch_model: gradients
+loss:
+  dice_weight: 0.5
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  focal_weight: 1.0
+  type: CombinedFocalDiceLoss
+model:
+  decoder: FCNDecoder
+  depth: 12
+  embed_dim: 768
+  in_channels: 9
+  num_classes: 1
+  num_heads: 12
+  patch_size: 16
+  pretrained: true
+output:
+  base_dir: outputs/prithvi_results
+  figures_dir: figures
+  logs_dir: logs
+  model_dir: models
+reproducibility:
+  benchmark: true
+  deterministic: false
+  seed: 42
+training:
+  T_max: 500
+  batch_size: 4
+  beta1: 0.9
+  beta2: 0.999
+  dropout: 0.1
+  eps: 1.0e-08
+  eta_min: 1.0e-07
+  gradient_clip_val: 1.0
+  learning_rate: 1.0e-05
+  max_epochs: 5
+  monitor_metric: val_iou
+  monitor_mode: max
+  optimizer: AdamW
+  patience: 20
+  precision: 16-mixed
+  scheduler: CosineAnnealingLR
+  warmup_epochs: 10
+  weight_decay: 0.01
