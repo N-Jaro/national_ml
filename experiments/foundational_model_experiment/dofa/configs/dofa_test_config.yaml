@@ -1,0 +1,91 @@
+experiment:
+  name: dofa_water_segmentation_test
+  description: DOFA Foundation Model Experiment for water segmentation - Single HUC Test
+  model_type: dofa_base
+  paper: https://arxiv.org/abs/2403.15356
+
+data:
+  base_path: /u/nathanj/national_ml/data/processed/patch_dataset
+  huc_codes:
+    - "03030005" # Single HUC for testing
+  modalities:
+    - dem
+    - optical
+    - thermal
+    - sar
+  split_method: patch_level
+  split_ratio: 0.9
+  random_seed: 42
+  optical_channels: 6
+  total_channels: 9
+  image_size: 224
+  normalize_per_huc: true
+
+model:
+  decoder: UperNetDecoder
+  pretrained: false # Train from scratch for 9-channel input
+  in_channels: 9
+  num_classes: 1
+  patch_size: 16
+  embed_dim: 768
+  depth: 12
+  num_heads: 12
+
+training:
+  optimizer: AdamW
+  learning_rate: 1.0e-04 # Higher learning rate for testing
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-08
+  max_epochs: 5 # Short test run
+  batch_size: 4 # Smaller batch size for testing
+  patience: 20
+  scheduler: CosineAnnealingLR
+  T_max: 5
+  eta_min: 1.0e-07
+  warmup_epochs: 1
+  gradient_clip_val: 1.0
+  dropout: 0.1
+  precision: 16-mixed
+  monitor_metric: val_iou
+  monitor_mode: max
+
+loss:
+  type: CombinedFocalDiceLoss
+  focal_weight: 1.0
+  dice_weight: 0.5
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+
+logging:
+  experiment_tracking: wandb
+  project_name: dofa_water_segmentation_test
+  wandb:
+    entity: null
+    tags:
+      - dofa
+      - water_segmentation
+      - 4modal
+      - foundation_model
+      - test
+    group: dofa_test
+    notes: DOFA Foundation Model Experiment - Single HUC Test
+    log_model: false # Don't save models for test runs
+    watch_model: gradients
+  save_top_k: 1
+  save_last: true
+  monitor: val_iou
+  log_every_n_steps: 5
+  val_check_interval: 1.0
+
+output:
+  base_dir: outputs/dofa_test_results
+  model_dir: models
+  figures_dir: figures
+  logs_dir: logs
+
+reproducibility:
+  seed: 42
+  deterministic: false
+  benchmark: true
