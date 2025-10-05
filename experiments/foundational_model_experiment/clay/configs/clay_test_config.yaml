@@ -1,0 +1,84 @@
+experiment:
+  name: clay_water_segmentation_test
+  description: Clay Foundation Model Fine-tuning Test with 1 HUC
+  model_type: timm_clay_v1_base
+  paper: https://arxiv.org/abs/2404.15366
+data:
+  base_path: /u/nathanj/national_ml/data/processed/patch_dataset
+  huc_codes:
+    - "03030005" # Single HUC for testing
+  modalities:
+    - dem
+    - optical
+    - thermal
+    - sar
+  split_method: patch_level
+  split_ratio: 0.9
+  random_seed: 42
+  optical_channels: 6
+  total_channels: 9
+  image_size: 224
+  normalize_per_huc: true
+model:
+  task: "segmentation"
+  backbone: "timm_clay_v1_base"
+  decoder: "FCNDecoder"
+  num_classes: 1
+  pretrained: false # Don't use pre-trained weights - train from scratch
+  freeze_backbone: false
+  freeze_decoder: false
+  multimodal_strategy: "channel_fusion" # Options: optical_only, channel_fusion, learned_projection
+training:
+  optimizer: AdamW
+  learning_rate: 1.0e-05 # Conservative for fine-tuning foundation model
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-08
+  max_epochs: 2 # Very short test run
+  batch_size: 4 # Smaller batch for testing
+  patience: 30 # Longer patience for foundation model fine-tuning
+  scheduler: CosineAnnealingLR
+  T_max: 2 # Match max_epochs for test
+  eta_min: 1.0e-07
+  warmup_epochs: 2 # Short warmup for test
+  gradient_clip_val: 1.0
+  dropout: 0.1
+  precision: 32 # Use full precision for CPU testing
+  monitor_metric: val_loss # Match Prithvi monitoring
+  monitor_mode: min
+loss:
+  type: CombinedFocalDiceLoss
+  focal_weight: 0.7 # Match Prithvi loss configuration
+  dice_weight: 0.3
+  focal_alpha: 0.75
+  focal_gamma: 1.5
+logging:
+  experiment_tracking: wandb
+  project_name: clay_water_segmentation_test
+  wandb:
+    entity: null
+    tags:
+      - clay
+      - water_segmentation
+      - 4modal
+      - foundation_model
+      - test
+    group: clay_test
+    notes: Clay Foundation Model 1-HUC Test Run
+    log_model: false # Don't save model artifacts for test
+    watch_model: false # Don't watch gradients for test
+  save_top_k: 1
+  save_last: true
+  monitor: val_loss # Match Prithvi monitoring
+  log_every_n_steps: 5 # More frequent logging for test
+  val_check_interval: 1.0
+output:
+  base_dir: outputs/clay_test_results
+  model_dir: models
+  figures_dir: figures
+  logs_dir: logs
+reproducibility:
+  seed: 42
+  deterministic: false
+  benchmark: true
