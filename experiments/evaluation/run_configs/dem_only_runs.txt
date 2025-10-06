@@ -1,0 +1,13 @@
+# DEM ONLY Experiment Runs
+# Generated on 2025-10-05 16:30:00
+# Format: run_name|checkpoint_path
+run1|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_152727_run1/checkpoints/mdmt-dem-only-epoch=05-val_loss=1.1256.ckpt
+run2|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_160627_run2/checkpoints/mdmt-dem-only-epoch=07-val_loss=1.0951.ckpt
+run3|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_161627_run3/checkpoints/mdmt-dem-only-epoch=05-val_loss=1.0047.ckpt
+run4|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_174357_run4/checkpoints/mdmt-dem-only-epoch=12-val_loss=1.0705.ckpt
+run5|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_184814_run5/checkpoints/mdmt-dem-only-epoch=08-val_loss=1.2744.ckpt
+run6|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_190457_run6/checkpoints/mdmt-dem-only-epoch=01-val_loss=1.1602.ckpt
+run7|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_195617_run7/checkpoints/mdmt-dem-only-epoch=10-val_loss=1.3536.ckpt
+run8|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_200149_run8/checkpoints/mdmt-dem-only-epoch=08-val_loss=1.1068.ckpt
+run9|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_201705_run9/checkpoints/mdmt-dem-only-epoch=15-val_loss=1.1233.ckpt
+run10|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_only_20250930_202917_run10/checkpoints/mdmt-dem-only-epoch=06-val_loss=1.1174.ckpt

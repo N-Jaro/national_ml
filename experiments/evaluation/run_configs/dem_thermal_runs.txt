@@ -1,0 +1,13 @@
+# DEM + THERMAL Experiment Runs
+# Generated on 2025-10-05 15:21:54
+# Format: run_name|checkpoint_path
+run1|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250929_204629_run1/checkpoints/mdmt-dem-thermal-epoch=25-val_loss=0.6490.ckpt
+run2|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250929_204629_run2/checkpoints/mdmt-dem-thermal-epoch=58-val_loss=0.6076.ckpt
+run3|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250929_204629_run3/checkpoints/mdmt-dem-thermal-epoch=54-val_loss=0.5490.ckpt
+run4|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250929_204648_run4/checkpoints/mdmt-dem-thermal-epoch=39-val_loss=0.5869.ckpt
+run5|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_002706_run5/checkpoints/mdmt-dem-thermal-epoch=12-val_loss=0.6682.ckpt
+run6|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_013125_run6/checkpoints/mdmt-dem-thermal-epoch=44-val_loss=0.5943.ckpt
+run7|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_025610_run7/checkpoints/mdmt-dem-thermal-epoch=62-val_loss=0.6198.ckpt
+run8|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_030447_run8/checkpoints/mdmt-dem-thermal-epoch=49-val_loss=0.5667.ckpt
+run9|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_063406_run9/checkpoints/mdmt-dem-thermal-epoch=54-val_loss=0.5387.ckpt
+run10|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_thermal_20250930_065631_run10/checkpoints/mdmt-dem-thermal-epoch=45-val_loss=0.5167.ckpt

@@ -1,0 +1,13 @@
+# LANDSAT6B Experiment Runs
+# Generated on 2025-10-05 15:21:54
+# Format: run_name|checkpoint_path
+run1|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_120906_run1/checkpoints/mdmt-epoch=57-val_loss=0.4440.ckpt
+run2|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_120906_run2/checkpoints/mdmt-epoch=54-val_loss=0.4265.ckpt
+run3|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_120906_run3/checkpoints/mdmt-epoch=61-val_loss=0.4539.ckpt
+run4|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_120906_run4/checkpoints/mdmt-epoch=76-val_loss=0.4254.ckpt
+run5|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_193755_run5/checkpoints/mdmt-epoch=79-val_loss=0.4357.ckpt
+run6|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_195623_run6/checkpoints/mdmt-epoch=65-val_loss=0.4369.ckpt
+run7|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250925_214001_run7/checkpoints/mdmt-epoch=67-val_loss=0.4040.ckpt
+run8|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250926_020322_run8/checkpoints/mdmt-epoch=73-val_loss=0.4403.ckpt
+run9|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250926_043136_run9/checkpoints/mdmt-epoch=62-val_loss=0.4402.ckpt
+run10|/u/nathanj/national_ml/experiments/training/lightning_logs/combineFL_ls6b_20250926_053451_run10/checkpoints/mdmt-epoch=62-val_loss=0.4468.ckpt

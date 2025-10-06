@@ -1,0 +1,13 @@
+# DEM + SAR Experiment Runs
+# Generated on 2025-10-05 15:21:54
+# Format: run_name|checkpoint_path
+run1|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250929_184756_run1/checkpoints/mdmt-dem-sar-epoch=71-val_loss=0.4360.ckpt
+run2|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250929_185106_run2/checkpoints/mdmt-dem-sar-epoch=60-val_loss=0.4548.ckpt
+run3|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250929_202024_run3/checkpoints/mdmt-dem-sar-epoch=70-val_loss=0.4529.ckpt
+run4|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250929_204629_run4/checkpoints/mdmt-dem-sar-epoch=66-val_loss=0.4254.ckpt
+run5|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_011353_run5/checkpoints/mdmt-dem-sar-epoch=65-val_loss=0.4224.ckpt
+run6|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_015620_run6/checkpoints/mdmt-dem-sar-epoch=53-val_loss=0.4483.ckpt
+run7|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_032259_run7/checkpoints/mdmt-dem-sar-epoch=66-val_loss=0.4434.ckpt
+run8|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_033343_run8/checkpoints/mdmt-dem-sar-epoch=61-val_loss=0.4389.ckpt
+run9|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_073903_run9/checkpoints/mdmt-dem-sar-epoch=62-val_loss=0.4442.ckpt
+run10|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_sar_20250930_075325_run10/checkpoints/mdmt-dem-sar-epoch=77-val_loss=0.4310.ckpt

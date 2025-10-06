@@ -1,0 +1,6 @@
+# Small Test HUC List for Quick MDMT Evaluation
+# Contains only 3 HUCs to test performance
+# Generated on 2025-10-05 for performance testing
+02080201
+22010000
+08050002

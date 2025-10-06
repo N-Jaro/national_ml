@@ -1,0 +1,13 @@
+# DEM + OPTICAL Experiment Runs
+# Generated on 2025-10-05 15:21:54
+# Format: run_name|checkpoint_path
+run1|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250929_222203_run1/checkpoints/mdmt-dem-optical-epoch=57-val_loss=0.4392.ckpt
+run2|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_020821_run2/checkpoints/mdmt-dem-optical-epoch=65-val_loss=0.4358.ckpt
+run3|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_030706_run3/checkpoints/mdmt-dem-optical-epoch=51-val_loss=0.4470.ckpt
+run4|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_040659_run4/checkpoints/mdmt-dem-optical-epoch=63-val_loss=0.4224.ckpt
+run5|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_045602_run5/checkpoints/mdmt-dem-optical-epoch=77-val_loss=0.4290.ckpt
+run6|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_091956_run6/checkpoints/mdmt-dem-optical-epoch=65-val_loss=0.4333.ckpt
+run7|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_122326_run7/checkpoints/mdmt-dem-optical-epoch=58-val_loss=0.4254.ckpt
+run8|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_130356_run8/checkpoints/mdmt-dem-optical-epoch=68-val_loss=0.4289.ckpt
+run9|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_130814_run9/checkpoints/mdmt-dem-optical-epoch=57-val_loss=0.4704.ckpt
+run10|/u/nathanj/national_ml/experiments/training/lightning_logs/dem_optical_20250930_165727_run10/checkpoints/mdmt-dem-optical-epoch=65-val_loss=0.4395.ckpt
