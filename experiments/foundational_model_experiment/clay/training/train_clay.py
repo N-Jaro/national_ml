@@ -73,7 +73,7 @@ class ClayFoundationModel(pl.LightningModule):
     def _build_model(self):
         """Build clay model using TerraTorch with 9-channel input and fine-tuning support."""
         try:
-            from clay_multimodal_wrapper import ClayMultimodalWrapper
+            from .clay_multimodal_wrapper import ClayMultimodalWrapper
             
             factory = EncoderDecoderFactory()
             
