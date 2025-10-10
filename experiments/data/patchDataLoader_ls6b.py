@@ -15,7 +15,7 @@ def _parse_huc_stats(stats_json: Dict[str, Any]) -> Dict[str, Dict[str, np.ndarr
     Convert your normalization_stats.json schema into broadcastable numpy arrays.
     Expected keys (based on your example):
       dem:     elevation_mean, elevation_stdDev
-      optical: SR_B2_mean/stdDev, SR_B3_mean/stdDev, SR_B4_mean/stdDev
+      optical: SR_B2_mean/stdDev, SR_B3_mean/stdDev, SR_B4_mean/stdDev, SR_B5_mean/stdDev, SR_B6_mean/stdDev, SR_B7_mean/stdDev
       thermal: ST_B10_mean/stdDev
       sar:     VV_mean/stdDev
     """
