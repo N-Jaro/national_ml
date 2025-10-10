@@ -1,0 +1,7 @@
+# Generated on 2025-10-08 12:32 PM
+# Format: run_name|checkpoint_path
+# run1|/u/nathanj/national_ml/experiments/foundational_model_experiment/clay/outputs/models/clay_9ch_20251005_100452_run1/checkpoints/epoch=58-val_loss=0.2915.ckpt
+# run2|/u/nathanj/national_ml/experiments/foundational_model_experiment/clay/outputs/models/clay_9ch_20251005_100452_run2/checkpoints/epoch=70-val_loss=0.2908.ckpt
+# run3|/u/nathanj/national_ml/experiments/foundational_model_experiment/clay/outputs/models/clay_9ch_20251005_100452_run3/checkpoints/epoch=50-val_loss=0.2915.ckpt
+run4|/u/nathanj/national_ml/experiments/foundational_model_experiment/clay/outputs/models/clay_9ch_20251006_083952_run4/checkpoints/epoch=60-val_loss=0.2915.ckpt
+run5|/u/nathanj/national_ml/experiments/foundational_model_experiment/clay/outputs/models/clay_9ch_20251006_104523_run5/checkpoints/epoch=75-val_loss=0.2895.ckpt

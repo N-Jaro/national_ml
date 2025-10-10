@@ -1,0 +1,7 @@
+# Generated on 2025-10-08 12:32 PM
+# Format: run_name|checkpoint_path
+# run1|/u/nathanj/national_ml/experiments/foundational_model_experiment/prithvi/outputs/models/prithvi_9ch_20251004_223048_run7/checkpoints/epoch=28-val_loss=0.2528.ckpt
+# run2|/u/nathanj/national_ml/experiments/foundational_model_experiment/prithvi/outputs/models/prithvi_9ch_20251004_223400_run8/checkpoints/epoch=28-val_loss=0.2520.ckpt
+run3|/u/nathanj/national_ml/experiments/foundational_model_experiment/prithvi/outputs/models/prithvi_9ch_20251004_171546_run3/checkpoints/epoch=31-val_loss=0.2592.ckpt
+# run4|/u/nathanj/national_ml/experiments/foundational_model_experiment/prithvi/outputs/models/prithvi_9ch_20251004_171546_run2/checkpoints/epoch=26-val_loss=0.2528.ckpt
+# run5|/u/nathanj/national_ml/experiments/foundational_model_experiment/prithvi/outputs/models/prithvi_9ch_20251004_160704_run10/checkpoints/epoch=30-val_loss=0.2534.ckpt
