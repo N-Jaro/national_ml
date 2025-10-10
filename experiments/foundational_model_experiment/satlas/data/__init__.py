@@ -5,13 +5,17 @@ Data handling specifically designed for SatLas foundation model experiments.
 """
 
 from .four_modal_dataset_adapter import (
-    SatlasMultimodalDataset,
-    SatlasDataModule,
-    FourModalDataModule  # Alias for compatibility
+    FourModalPatchDatasetAdapter,
+    FourModalPatchDataset,
+    FourModalDataModule
 )
 
+# Alias for backward compatibility
+SatlasDataModule = FourModalDataModule
+
 __all__ = [
-    'SatlasMultimodalDataset',
-    'SatlasDataModule',
-    'FourModalDataModule'
+    'FourModalPatchDatasetAdapter',
+    'FourModalPatchDataset', 
+    'FourModalDataModule',
+    'SatlasDataModule'
 ]

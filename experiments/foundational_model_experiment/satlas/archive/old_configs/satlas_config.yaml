@@ -63,8 +63,8 @@ data:
     - thermal
     - sar
   split_method: patch_level
-  split_ratio: 0.9
-  random_seed: 42
+  train_ratio: 0.9 # Match Prithvi/Clay for fair comparison
+  # random_seed not needed for SATLAS
   optical_channels: 6
   total_channels: 9
   image_size: 224
@@ -72,7 +72,7 @@ data:
 
 model:
   decoder: UperNetDecoder
-  pretrained: false # Train from scratch for 9-channel input
+  pretrained: true # Use pre-trained SATLAS checkpoint from TerraTorch
   in_channels: 9
   num_classes: 1
   # SatLas-specific parameters
@@ -80,30 +80,30 @@ model:
 
 training:
   optimizer: AdamW
-  learning_rate: 1.0e-05
+  learning_rate: 2.0e-05
   weight_decay: 0.01
   beta1: 0.9
   beta2: 0.999
   eps: 1.0e-08
   max_epochs: 500
-  batch_size: 16
-  patience: 20
+  batch_size: 8
+  patience: 30
   scheduler: CosineAnnealingLR
   T_max: 500
-  eta_min: 1.0e-07
-  warmup_epochs: 10
+  eta_min: 1.0e-06
+  warmup_epochs: 20
   gradient_clip_val: 1.0
   dropout: 0.1
   precision: 16-mixed
-  monitor_metric: val_iou
-  monitor_mode: max
+  monitor_metric: val_loss
+  monitor_mode: min
 
 loss:
   type: CombinedFocalDiceLoss
-  focal_weight: 1.0
-  dice_weight: 0.5
-  focal_alpha: 0.25
-  focal_gamma: 2.0
+  focal_weight: 0.7
+  dice_weight: 0.3
+  focal_alpha: 0.75
+  focal_gamma: 1.5
 
 logging:
   experiment_tracking: wandb
@@ -121,7 +121,7 @@ logging:
     watch_model: gradients
   save_top_k: 3
   save_last: true
-  monitor: val_iou
+  monitor: val_loss
   log_every_n_steps: 10
   val_check_interval: 1.0
 

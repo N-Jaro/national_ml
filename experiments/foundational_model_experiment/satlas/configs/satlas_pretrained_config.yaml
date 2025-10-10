@@ -1,0 +1,153 @@
+# SATLAS Pretrained Foundation Model Configuration
+# Uses actual SATLAS pretrained weights via TerraTorch
+
+experiment:
+  name: "SATLAS_Pretrained_9Ch_Water_Segmentation"
+  description: "SATLAS foundation model with pretrained weights for water segmentation using 9-channel input"
+  version: "1.0"
+  tags:
+    ["satlas", "pretrained", "foundation_model", "water_segmentation", "9ch"]
+
+# Data configuration - matches Prithvi/Clay exactly
+data:
+  dataset_name: "four_modal_dataset"
+  base_path: "/u/nathanj/national_ml/data/processed/patch_dataset"
+  huc_codes:
+    - "03160113"
+    - "19090102"
+    - "17090011"
+    - "03040206"
+    - "18070103"
+    - "12090302"
+    - "14010005"
+    - "10260010"
+    - "19050105"
+    - "05040003"
+    - "17100206"
+    - "11020004"
+    - "19020504"
+    - "19050401"
+    - "03050108"
+    - "10170204"
+    - "07140202"
+    - "12070101"
+    - "10120203"
+    - "18020151"
+    - "12090202"
+    - "07040006"
+    - "05080002"
+    - "18020126"
+    - "08020205"
+    - "18020111"
+    - "13060003"
+    - "18070107"
+    - "07130003"
+    - "17110012"
+    - "03030005"
+    - "04060102"
+    - "17010203"
+    - "14060004"
+    - "19080302"
+    - "07130004"
+    - "19080204"
+    - "10270104"
+    - "12090104"
+    - "13070007"
+    - "03160106"
+    - "07030005"
+    - "05090104"
+    - "13040209"
+    - "17060109"
+    - "16040204"
+    - "08020301"
+    - "10130306"
+    - "18080003"
+    - "07120005"
+
+  modalities:
+    - dem
+    - optical
+    - thermal
+    - sar
+  split_method: patch_level
+  train_ratio: 0.8
+  random_seed: 42
+  optical_channels: 6
+  total_channels: 9
+  image_size: 224
+  normalize_per_huc: true
+
+# Model configuration - SATLAS pretrained
+model:
+  name: "satlas_pretrained"
+  backbone: "terratorch_satlas_swin_b_sentinel2_mi_ms" # Multi-Image Multi-Spectral SATLAS
+  decoder: "FCNDecoder" # FCN decoder for segmentation (matches Prithvi)
+  num_classes: 1 # Binary water segmentation
+  pretrained: true # Use pretrained SATLAS weights
+
+  # Model-specific parameters
+  decoder_channels: 128
+  head_dropout: 0.1
+  drop_path_rate: 0.1
+  layer_decay: 0.75
+
+# Loss configuration - EXACT match to Prithvi's stable pattern
+loss:
+  type: CombinedFocalDiceLoss
+  focal_weight: 0.7 # Exact match to Prithvi
+  dice_weight: 0.3 # Exact match to Prithvi
+  focal_alpha: 0.75 # Exact match to Prithvi (stable)
+  focal_gamma: 2.0 # Exact match to Prithvi (was 1.5, now 2.0)
+
+# Training configuration - Optimized for SATLAS stability
+training:
+  optimizer: AdamW
+  learning_rate: 1.0e-05 # Reduced from 2e-5 for stability with new seg head
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-08
+  max_epochs: 200 # Reduced for faster convergence testing
+  batch_size: 8 # Conservative batch size
+  patience: 30 # Good patience for stability
+  scheduler: CosineAnnealingLR
+  T_max: 200 # Match max_epochs
+  eta_min: 1.0e-07 # Lower minimum for better fine-tuning
+  warmup_epochs: 20 # Good warmup period
+  gradient_clip_val: 0.5 # More aggressive clipping for stability
+  dropout: 0.1
+  precision: 32 # Use 32-bit for more stability during debugging
+  monitor_metric: val_loss
+  monitor_mode: min
+
+logging:
+  experiment_tracking: wandb
+  project_name: national_ml_satlas_pretrained
+  wandb:
+    entity: null
+    tags:
+      - satlas
+      - water_segmentation
+      - 4modal
+      - foundation_model
+      - pretrained
+    group: satlas
+    notes: SATLAS Foundation Model with pretrained weights for water segmentation
+    log_model: false
+    watch_model: false
+  save_top_k: 3
+  save_last: true
+  monitor: val_loss
+  log_every_n_steps: 10
+  val_check_interval: 1.0
+
+output:
+  base_dir: outputs/satlas_results
+  model_dir: models
+  figures_dir: figures
+  logs_dir: logs
+
+reproducibility:
+  seed: 42
+  deterministic: false
+  benchmark: true

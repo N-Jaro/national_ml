@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 import yaml
 import logging
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -32,7 +33,7 @@ except ImportError as e:
     sys.exit(1)
 
 # Local imports
-from data.four_modal_dataset_adapter import SatlasDataModule
+from data.four_modal_dataset_adapter import FourModalDataModule
 from utils.losses import CombinedFocalDiceLoss
 
 # Set up logging
@@ -137,6 +138,7 @@ class SatlasFoundationModel(pl.LightningModule):
         
         # Update metrics
         preds = torch.sigmoid(outputs) > 0.5
+        preds = preds.squeeze(1)  # Remove channel dimension to match mask shape
         metrics = self.train_metrics(preds.int(), masks.int())
         self.log_dict({f"train_{k}": v for k, v in metrics.items()}, on_epoch=True)
         
@@ -157,6 +159,7 @@ class SatlasFoundationModel(pl.LightningModule):
         
         # Update metrics
         preds = torch.sigmoid(outputs) > 0.5
+        preds = preds.squeeze(1)  # Remove channel dimension to match mask shape
         metrics = self.val_metrics(preds.int(), masks.int())
         self.log_dict({f"val_{k}": v for k, v in metrics.items()}, on_epoch=True)
         
@@ -224,18 +227,20 @@ def main():
     
     # Set up data module
     logger.info("Setting up data module...")
-    data_module = SatlasDataModule(config)
+    data_module = FourModalDataModule(config)
     data_module.setup(stage="fit")
     
     # Set up model
     logger.info("Setting up SatLas model...")
     model = SatlasFoundationModel(config)
     
+    # Set up wandb run name following same pattern as Prithvi
+    wandb_run_name = os.environ.get('WANDB_NAME') or os.environ.get('WANDB_RUN_ID') or "satlas_9ch_water_segmentation"
+    
     # Set up logger
-    experiment_name = f"satlas_4modal_water_segmentation_{'test' if args.test else 'full'}"
     wandb_logger = WandbLogger(
         project=config["logging"]["project_name"],
-        name=experiment_name,
+        name=wandb_run_name,
         tags=config["logging"]["wandb"]["tags"],
         group=config["logging"]["wandb"]["group"],
         notes=config["logging"]["wandb"]["notes"]
@@ -255,11 +260,24 @@ def main():
     wandb_logger.log_hyperparams(dataset_info)
     logger.info(f"Dataset info: {dataset_info}")
     
+    # Set up checkpoint directory based on wandb run (following Prithvi pattern)
+    # If WANDB_RUN_ID or WANDB_NAME is set (from SLURM array), use it for unique directory
+    wandb_run_name_for_dir = os.environ.get('WANDB_NAME') or os.environ.get('WANDB_RUN_ID')
+    if wandb_run_name_for_dir:
+        checkpoint_dir = os.path.join("outputs", "models", wandb_run_name_for_dir, "checkpoints")
+    else:
+        # Fallback to generic directory
+        checkpoint_dir = os.path.join("outputs", "models", "checkpoints")
+    
+    # Create checkpoint directory
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    logger.info(f"Checkpoints will be saved to: {checkpoint_dir}")
+    
     # Set up callbacks
     callbacks = [
         ModelCheckpoint(
-            dirpath=config["output"]["base_dir"] + "/" + config["output"]["model_dir"],
-            filename="satlas-{epoch:02d}-{val_loss:.2f}",
+            dirpath=checkpoint_dir,
+            filename="{epoch:02d}-{val_loss:.4f}",
             monitor=config["logging"]["monitor"],
             mode=config["training"]["monitor_mode"],
             save_top_k=config["logging"]["save_top_k"],

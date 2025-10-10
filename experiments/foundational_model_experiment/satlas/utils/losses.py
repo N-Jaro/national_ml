@@ -324,8 +324,68 @@ class SatlasAdaptiveLoss(nn.Module):
         return focal_weight * focal_loss_value + dice_weight * dice_loss_value
 
 
-# Alias for backward compatibility  
-CombinedFocalDiceLoss = SatlasCombinedLoss
+# Stable CombinedFocalDiceLoss following Prithvi's proven pattern
+class CombinedFocalDiceLoss(nn.Module):
+    """
+    Stable Combined Focal + Dice Loss following Prithvi's proven pattern.
+    
+    Uses FIXED weights instead of adaptive weights for training stability.
+    This implementation exactly matches the successful Prithvi pattern.
+    """
+    
+    def __init__(self, focal_weight=0.7, dice_weight=0.3, focal_alpha=0.75, focal_gamma=2.0):
+        """
+        Initialize stable combined loss with Prithvi's default parameters.
+        
+        Args:
+            focal_weight: Fixed weight for focal loss (default: 0.7 like Prithvi)
+            dice_weight: Fixed weight for dice loss (default: 0.3 like Prithvi)  
+            focal_alpha: Alpha parameter for focal loss (default: 0.75 like Prithvi)
+            focal_gamma: Gamma parameter for focal loss (default: 2.0 like Prithvi)
+        """
+        super().__init__()
+        
+        self.focal_loss = SatlasFocalLoss(alpha=focal_alpha, gamma=focal_gamma)
+        self.dice_loss = SatlasDiceLoss()
+        
+        # FIXED weights (no adaptation) - key for stability
+        self.focal_weight = focal_weight
+        self.dice_weight = dice_weight
+        
+        print(f"✅ CombinedFocalDiceLoss initialized (Prithvi pattern):")
+        print(f"   Focal weight: {self.focal_weight}")
+        print(f"   Dice weight: {self.dice_weight}")
+        print(f"   Focal alpha: {focal_alpha}, gamma: {focal_gamma}")
+    
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Compute stable combined focal + dice loss.
+        
+        Args:
+            inputs: Predictions of shape (N, 1, H, W) or (N, H, W)
+            targets: Ground truth of shape (N, H, W) or (N, 1, H, W)
+            
+        Returns:
+            Combined loss value with stable weights
+        """
+        focal_loss_value = self.focal_loss(inputs, targets)
+        dice_loss_value = self.dice_loss(inputs, targets)
+        
+        # Simple fixed combination - matches Prithvi's stable pattern
+        combined_loss = self.focal_weight * focal_loss_value + self.dice_weight * dice_loss_value
+        
+        # Validation checks for debugging
+        if torch.isnan(combined_loss) or torch.isinf(combined_loss):
+            print(f"❌ Invalid loss detected!")
+            print(f"   Focal: {focal_loss_value.item():.4f}")
+            print(f"   Dice: {dice_loss_value.item():.4f}")
+            print(f"   Combined: {combined_loss.item():.4f}")
+        
+        return combined_loss
+
+
+# Backward compatibility alias
+StableCombinedFocalDiceLoss = CombinedFocalDiceLoss
 
 
 def test_satlas_losses():
@@ -350,6 +410,7 @@ def test_satlas_losses():
             'Focal': SatlasFocalLoss(),
             'Dice': SatlasDiceLoss(), 
             'Combined': SatlasCombinedLoss(),
+            'StableCombined': CombinedFocalDiceLoss(),  # Prithvi-style stable loss
             'IoU': SatlasIoULoss(),
             'Adaptive': SatlasAdaptiveLoss()
         }
