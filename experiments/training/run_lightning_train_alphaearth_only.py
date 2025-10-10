@@ -11,7 +11,10 @@ from data_module_alphaearth_only import PatchDataModule_AlphaEarth_Only
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_path", type=str, default="/u/nathanj/national_ml/data/processed/patch_dataset/")
-    parser.add_argument("--hucs", type=str, required=True, help="One or more HUC codes, comma-separated (e.g. 03030005,03040206,03050108)")
+    parser.add_argument("--train_hucs", type=str, required=True, 
+                       help="Training HUC codes, comma-separated (e.g. 03030005,03040206)")
+    parser.add_argument("--val_hucs", type=str, required=True,
+                       help="Validation HUC codes, comma-separated (e.g. 16040204,08020301)")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -38,14 +41,19 @@ def main():
     # Use tensor cores effectively on H100
     torch.set_float32_matmul_precision("high")
 
-    # Prepare data
-    huc_list = [h.strip() for h in args.hucs.split(",") if h.strip()]
+    # Prepare data with HUC-level train/val split
+    train_hucs = [h.strip() for h in args.train_hucs.split(",") if h.strip()]
+    val_hucs = [h.strip() for h in args.val_hucs.split(",") if h.strip()]
+    
+    print(f"Train HUCs ({len(train_hucs)}): {train_hucs}")
+    print(f"Val HUCs ({len(val_hucs)}): {val_hucs}")
+    
     dm = PatchDataModule_AlphaEarth_Only(
         base_path=args.base_path,
-        huc_list=huc_list,
+        train_hucs=train_hucs,
+        val_hucs=val_hucs,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        val_split=args.val_split,
         alphaearth_channels=args.alphaearth_channels,
     )
     # compute stats (pos_weight & class weights) before creating the module

@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
-from train_mdmt_lightning import MDMTLitModule
+from train_all_modalities_lightning import MDMTLitModule
 from data_module import PatchDataModule
 
 def main():

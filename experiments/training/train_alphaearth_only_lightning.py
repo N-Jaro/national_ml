@@ -258,12 +258,12 @@ class MDMT_AlphaEarth_Only_LitModule(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
     
     def _log_val_visuals(self, batch):
-        """Log a few samples (first val batch) every 10 epochs to W&B."""
+        """Log a few samples (first val batch) every 5 epochs to W&B."""
         if not isinstance(self.logger, WandbLogger):
             return
         if self.global_rank != 0:  # avoid duplicate logs under DDP
             return
-        if (self.current_epoch % 10) != 0:
+        if (self.current_epoch % 5) != 0:
             return
 
         alphaearth = batch["alphaearth"]

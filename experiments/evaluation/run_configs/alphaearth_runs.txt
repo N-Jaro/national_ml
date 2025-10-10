@@ -1,12 +1,12 @@
 # ALPHAEARTH Experiment Runs
 # Generated on 2025-10-05 15:21:54
 # Format: run_name|checkpoint_path
-run1|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run1/checkpoints/mdmt-alphaearth-only-epoch=33-val_loss=0.8076.ckpt
-run2|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run2/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8024.ckpt
-run3|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run3/checkpoints/mdmt-alphaearth-only-epoch=29-val_loss=0.8050.ckpt
-run4|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run4/checkpoints/mdmt-alphaearth-only-epoch=27-val_loss=0.8197.ckpt
-run5|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_044108_run5/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8233.ckpt
-run6|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_062438_run6/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8175.ckpt
+#run1|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run1/checkpoints/mdmt-alphaearth-only-epoch=33-val_loss=0.8076.ckpt
+#run2|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run2/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8024.ckpt
+#run3|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run3/checkpoints/mdmt-alphaearth-only-epoch=29-val_loss=0.8050.ckpt
+#run4|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251002_115437_run4/checkpoints/mdmt-alphaearth-only-epoch=27-val_loss=0.8197.ckpt
+#run5|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_044108_run5/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8233.ckpt
+#run6|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_062438_run6/checkpoints/mdmt-alphaearth-only-epoch=28-val_loss=0.8175.ckpt
 run7|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_074013_run7/checkpoints/mdmt-alphaearth-only-epoch=24-val_loss=0.8241.ckpt
 run8|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_083320_run8/checkpoints/mdmt-alphaearth-only-epoch=21-val_loss=0.8174.ckpt
 run9|/u/nathanj/national_ml/experiments/training/lightning_logs/alphaearth_only_20251003_162615_run9/checkpoints/mdmt-alphaearth-only-epoch=30-val_loss=0.8101.ckpt

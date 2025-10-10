@@ -24,20 +24,34 @@ class MDMT_DEM_Thermal_DataModule(pl.LightningDataModule):
     def __init__(
         self,
         base_path: str,
-        huc_codes: List[str],
+        huc_codes: List[str] = None,        # For backward compatibility
+        train_hucs: List[str] = None,       # New: explicit train HUCs
+        val_hucs: List[str] = None,         # New: explicit val HUCs
         batch_size: int = 32,
         num_workers: int = 4,
-        val_split: float = 0.2,
+        val_split: float = 0.2,             # Only used if huc_codes provided
         **kwargs
     ):
         super().__init__()
         self.save_hyperparameters()
         
         self.base_path = base_path
-        self.huc_codes = huc_codes
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.val_split = val_split
+        
+        # Handle both old and new HUC specification methods
+        if train_hucs is not None and val_hucs is not None:
+            # New explicit train/val HUC split
+            self.train_hucs = train_hucs
+            self.val_hucs = val_hucs
+            self.use_explicit_split = True
+        elif huc_codes is not None:
+            # Old method: split HUCs randomly
+            self.huc_codes = huc_codes  
+            self.val_split = val_split
+            self.use_explicit_split = False
+        else:
+            raise ValueError("Must provide either (train_hucs, val_hucs) or huc_codes")
         
         # Initialize datasets
         self.train_dataset = None

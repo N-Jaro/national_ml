@@ -12,21 +12,35 @@ class PatchDataModule_DEM_AlphaEarth(pl.LightningDataModule):
     def __init__(
         self,
         base_path,
-        huc_list,
+        huc_list=None,              # For backward compatibility
+        train_hucs=None,            # New: explicit train HUCs
+        val_hucs=None,              # New: explicit val HUCs
         batch_size=4,
         num_workers=4,
-        val_split=0.1,
+        val_split=0.1,              # Only used if huc_list provided
         alphaearth_channels=64,
         estimate_weights_from=64,   # number of samples for quick stats
     ):
         super().__init__()
         self.base_path = base_path
-        self.huc_list = huc_list
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.val_split = val_split
         self.alphaearth_channels = alphaearth_channels
         self.estimate_weights_from = estimate_weights_from
+        
+        # Handle both old and new HUC specification methods
+        if train_hucs is not None and val_hucs is not None:
+            # New explicit train/val HUC split
+            self.train_hucs = train_hucs
+            self.val_hucs = val_hucs
+            self.use_explicit_split = True
+        elif huc_list is not None:
+            # Old method: split HUCs randomly
+            self.huc_list = huc_list  
+            self.val_split = val_split
+            self.use_explicit_split = False
+        else:
+            raise ValueError("Must provide either (train_hucs, val_hucs) or huc_list")
 
         # to be set in setup()
         self.train_ds = None
@@ -35,19 +49,40 @@ class PatchDataModule_DEM_AlphaEarth(pl.LightningDataModule):
         self.d8_class_weights = None
 
     def setup(self, stage=None):
-        # full dataset (with per-HUC normalization inside loader)
-        full = MultimodalPatchDataset_DEM_AlphaEarth(
-            base_path=self.base_path,
-            huc_codes=self.huc_list,
-            alphaearth_channels=self.alphaearth_channels,
-            dtype_inputs=torch.float32,
-            stats_filename="normalization_stats.json",
-        )
-        n_total = len(full)
-        n_val = max(1, int(n_total * self.val_split))
-        n_train = n_total - n_val
-        self.train_ds, self.val_ds = random_split(full, [n_train, n_val])
-        print(f"Using {n_train} train + {n_val} val patches (total={n_total})")
+        if self.use_explicit_split:
+            # New approach: HUC-level train/val split
+            self.train_ds = MultimodalPatchDataset_DEM_AlphaEarth(
+                base_path=self.base_path,
+                huc_codes=self.train_hucs,
+                alphaearth_channels=self.alphaearth_channels,
+                dtype_inputs=torch.float32,
+                stats_filename="normalization_stats.json",
+            )
+            self.val_ds = MultimodalPatchDataset_DEM_AlphaEarth(
+                base_path=self.base_path,
+                huc_codes=self.val_hucs,
+                alphaearth_channels=self.alphaearth_channels,
+                dtype_inputs=torch.float32,
+                stats_filename="normalization_stats.json",
+            )
+            n_train, n_val = len(self.train_ds), len(self.val_ds)
+            print(f"HUC-level split: {n_train} train + {n_val} val patches")
+            print(f"Train HUCs ({len(self.train_hucs)}): {self.train_hucs}")
+            print(f"Val HUCs ({len(self.val_hucs)}): {self.val_hucs}")
+        else:
+            # Old approach: random patch-level split
+            full = MultimodalPatchDataset_DEM_AlphaEarth(
+                base_path=self.base_path,
+                huc_codes=self.huc_list,
+                alphaearth_channels=self.alphaearth_channels,
+                dtype_inputs=torch.float32,
+                stats_filename="normalization_stats.json",
+            )
+            n_total = len(full)
+            n_val = max(1, int(n_total * self.val_split))
+            n_train = n_total - n_val
+            self.train_ds, self.val_ds = random_split(full, [n_train, n_val])
+            print(f"Random split: {n_train} train + {n_val} val patches (total={n_total})")
 
         # ---- estimate weights on a subset of training patches ----
         N = min(self.estimate_weights_from, len(self.train_ds))

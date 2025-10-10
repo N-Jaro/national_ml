@@ -33,10 +33,11 @@ nvidia-smi
 export WANDB_PROJECT="national_ml_dem_thermal"
 export WANDB_JOB_TYPE="single_train"
 
-# HUC codes for training (smaller subset for single job testing)
-HUC_CODES="03030005,03040206,03050101"
+# Modern HUC-level train/val split configuration
+TRAIN_HUCS="03160113,19090102,17090011,03040206,18070103,12090302,14010005,10260010,19050105,05040003,17100206,11020004,19020504,19050401,03050108,10170204,07140202,12070101,10120203,18020151,12090202,07040006,05080002,18020126,08020205,18020111,13060003,18070107,07130003,17110012,03030005,04060102,17010203,14060004,19080302,07130004,19080204,10270104,12090104,13070007,03160106,07030005,05090104,13040209,17060109"
+VAL_HUCS="16040204,08020301,10130306,18080003,07120005"
 
-# Training parameters (shorter training for single job)
+# Training parameters
 BATCH_SIZE=32
 EPOCHS=100
 LEARNING_RATE=1e-4
@@ -53,16 +54,19 @@ WATER_LOSS_SCALE=1.0
 D8_LOSS_SCALE=0.5
 
 # Training configuration
-PRECISION="32"
-OPTIMIZER="Adam"
-VAL_SPLIT=0.2
+PRECISION="16"
+OPTIMIZER="AdamW"
 
 # Create unique run name
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RUN_NAME="dem_thermal_single_${SLURM_JOB_ID}_${TIMESTAMP}"
 
+echo "=== HUC-level Train/Val Split ==="
+echo "Train HUCs: 45 HUCs"
+echo "Val HUCs: 5 HUCs"
+echo "Total: 50 HUCs"
+echo ""
 echo "Starting training with the following parameters:"
-echo "  HUC codes: $HUC_CODES"
 echo "  Batch size: $BATCH_SIZE"
 echo "  Epochs: $EPOCHS"
 echo "  Learning rate: $LEARNING_RATE"
@@ -71,25 +75,23 @@ echo "  Base channels: $BASE_CHANNELS"
 echo "  Water loss scale: $WATER_LOSS_SCALE"
 echo "  D8 loss scale: $D8_LOSS_SCALE"
 
-# Run training
+# Run training with HUC-level splitting
 python run_lightning_train_dem_thermal.py \
     --base_path /u/nathanj/national_ml/data/processed/patch_dataset \
-    --hucs "$HUC_CODES" \
+    --train_hucs "$TRAIN_HUCS" \
+    --val_hucs "$VAL_HUCS" \
     --batch_size $BATCH_SIZE \
     --epochs $EPOCHS \
     --lr $LEARNING_RATE \
-    --patience $PATIENCE \
+    --early_stopping_patience $PATIENCE \
     --num_workers $NUM_WORKERS \
-    --val_split $VAL_SPLIT \
     --base_channels $BASE_CHANNELS \
-    --n_classes_task1 $N_CLASSES_TASK1 \
-    --n_classes_task2 $N_CLASSES_TASK2 \
     --precision $PRECISION \
     --optimizer $OPTIMIZER \
     --water_loss_scale $WATER_LOSS_SCALE \
     --d8_loss_scale $D8_LOSS_SCALE \
     --wandb_project "national_ml_dem_thermal" \
-    --wandb_run "$RUN_NAME" \
+    --experiment_name "${RUN_NAME}_huc_split" \
     --wandb_mode online \
     --gpus 1 \
     --seed 42

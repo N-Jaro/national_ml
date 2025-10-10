@@ -1,4 +1,6 @@
-# train_mdmt_lightning.py
+# train_all_modalities_lightning.py
+# Lightning module for All Modalities (no AlphaEarth) MDMT model
+# Uses ls6b architecture: DEM (1ch) + Optical (6ch) + Thermal (1ch) + SAR (1ch) = 9 channels
 import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -278,12 +280,12 @@ class MDMTLitModule(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
     
     def _log_val_visuals(self, batch):
-        """Log a few samples (first val batch) every 10 epochs to W&B."""
+        """Log a few samples (first val batch) every 5 epochs to W&B."""
         if not isinstance(self.logger, WandbLogger):
             return
         if self.global_rank != 0:  # avoid duplicate logs under DDP
             return
-        if (self.current_epoch % 10) != 0:
+        if (self.current_epoch % 5) != 0:
             return
 
         m1, m2, m3, m4 = batch["m1"], batch["m2"], batch["m3"], batch["m4"]

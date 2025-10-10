@@ -51,7 +51,7 @@ This directory contains complete training infrastructure for all model variants 
 ### 5. **Existing Models**
 
 #### 4-Modality Models
-- `train_mdmt_lightning.py` - Original 4-modality training (Landsat 6-band)
+- `train_all_modalities_lightning.py` - All Modalities (no AlphaEarth) training (Landsat 6-band, 9 channels total)
 - `data_module.py` - Original data module
 - `run_lightning_train.py` - Original CLI training script
 - `submit_train_array.sh` - Original SLURM array job
@@ -382,7 +382,7 @@ training/
 ├── submit_train_dem_sar_array.sh            # DEM+SAR array job
 ├── submit_train_dem_optical_single.sh       # DEM+Optical single job
 ├── submit_train_dem_sar_single.sh           # DEM+SAR single job
-├── train_mdmt_lightning.py                  # Original 4-modality module
+├── train_all_modalities_lightning.py        # All Modalities (no AlphaEarth) module
 ├── train_dem_thermal.py                     # Legacy DEM+Thermal (non-Lightning)
 ├── data_module.py                           # Original data module
 ├── run_lightning_train.py                   # Original CLI script
