@@ -484,25 +484,33 @@ def fast_evaluate_all_hucs(checkpoint_path: str, huc_codes: List[str],
         
         # Calculate and log summary statistics
         water_f1_scores = [r['water_f1'] for r in results]
+        water_iou_scores = [r['water_iou'] for r in results]
         d8_f1_scores = [r['d8_f1_macro'] for r in results]
+        d8_acc_scores = [r['d8_accuracy'] for r in results]
         
         summary_metrics = {
             "summary/mean_water_f1": np.mean(water_f1_scores),
             "summary/std_water_f1": np.std(water_f1_scores),
+            "summary/mean_water_iou": np.mean(water_iou_scores),
+            "summary/std_water_iou": np.std(water_iou_scores),
             "summary/mean_d8_f1": np.mean(d8_f1_scores),
             "summary/std_d8_f1": np.std(d8_f1_scores),
+            "summary/mean_d8_accuracy": np.mean(d8_acc_scores),
+            "summary/std_d8_accuracy": np.std(d8_acc_scores),
             "summary/total_hucs": len(results),
+            "summary/total_samples": len(results),
             "summary/csv_path": csv_path
         }
         wandb.log(summary_metrics)
         
         logger.info(f"Summary: Water F1={np.mean(water_f1_scores):.3f}±{np.std(water_f1_scores):.3f}, "
-                   f"D8 F1={np.mean(d8_f1_scores):.3f}±{np.std(d8_f1_scores):.3f}")
+                   f"D8 F1={np.mean(d8_f1_scores):.3f}±{np.std(d8_f1_scores):.3f}, "
+                   f"D8 Acc={np.mean(d8_acc_scores):.3f}±{np.std(d8_acc_scores):.3f}")
         
         wandb.finish()
     
     logger.info(f"Results saved to: {csv_path}")
-    return results
+    return results, csv_path
 
 def main():
     parser = argparse.ArgumentParser(description="Ultra-fast Landsat 6B Evaluator")
@@ -548,7 +556,7 @@ def main():
     if device.startswith('cuda'):
         torch.cuda.synchronize()
     start_time = datetime.now()
-    results = fast_evaluate_all_hucs(args.checkpoint, huc_codes, device=device, 
+    results, csv_path = fast_evaluate_all_hucs(args.checkpoint, huc_codes, device=device, 
                                    limit_batches=args.limit_batches, run_name=run_name, use_wandb=True)
     if device.startswith('cuda'):
         torch.cuda.synchronize()
@@ -602,29 +610,6 @@ def main():
         samples = result['total_samples']
         print(f"  {huc_id}: Water F1={water_f1:.3f}, D8 F1-macro={d8_f1:.3f}, Samples={samples}")
     print("="*80)
-    
-    # Save results to CSV (matching original format)
-    output_dir = "/u/nathanj/national_ml/experiments/evaluation/ultra_fast_results"
-    os.makedirs(output_dir, exist_ok=True)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Extract run name from checkpoint path
-    run_name = "unknown"
-    if "run" in args.checkpoint:
-        try:
-            # Look for lightning_logs directory which contains the run info
-            parts = args.checkpoint.split("/")
-            for part in parts:
-                if "run" in part and "_" in part:
-                    run_name = part.split("_")[-1]  # Extract run number (e.g., "run3")
-                    break
-        except:
-            pass
-    
-    csv_path = os.path.join(output_dir, f"landsat6b_{run_name}_{timestamp}.csv")
-    
-    df = pd.DataFrame(results)
-    df.to_csv(csv_path, index=False)
     print(f"Results saved to: {csv_path}")
     
     return 0

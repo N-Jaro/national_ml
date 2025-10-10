@@ -49,7 +49,7 @@ echo "Starting automated evaluation for all variants"
 echo "Using full test HUC list (67 HUCs)"
 echo "========================================"
 
-python run_ultrafast_evaluations.py --huc-list test_huc_list.txt --variant alphaearth
+python run_ultrafast_evaluations.py --huc-list test_huc_list.txt --variant dem_alphaearth
 
 # the varinants options are: 
 # dem_only, landsat6b, dem_optical, dem_sar, dem_thermal, dem_alphaearth, alphaearth
