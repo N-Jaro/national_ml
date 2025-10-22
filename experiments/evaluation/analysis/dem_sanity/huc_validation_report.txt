@@ -1,0 +1,168 @@
+DEM Sanity Analysis - HUC Validation Report
+================================================================================
+
+HUC: 01030003 (representative)
+Status: PARTIALLY_VALID
+Patches: 1766
+DEM Elevation: 357.5 to 640.7m
+AlphaEarth Channels: 64
+Water Coverage: 28.2%
+Issues found:
+  - patch_0.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 02080201 (representative)
+Status: PARTIALLY_VALID
+Patches: 1145
+DEM Elevation: 629.7 to 929.4m
+AlphaEarth Channels: 64
+Water Coverage: 4.0%
+Issues found:
+  - patch_0.npz: Missing keys: ['alphaearth']
+  - patch_1.npz: Missing keys: ['alphaearth']
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 08050002 (representative)
+Status: PARTIALLY_VALID
+Patches: 518
+DEM Elevation: 35.0 to 43.8m
+AlphaEarth Channels: 64
+Water Coverage: 3.2%
+Issues found:
+  - patch_1.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 14080106 (representative)
+Status: PARTIALLY_VALID
+Patches: 2342
+DEM Elevation: 2115.5 to 2195.2m
+AlphaEarth Channels: 64
+Water Coverage: 2.7%
+Issues found:
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 17020006 (representative)
+Status: PARTIALLY_VALID
+Patches: 2401
+DEM Elevation: 0.0 to 0.0m
+AlphaEarth Channels: 64
+Water Coverage: 6.3%
+Issues found:
+  - patch_0.npz: Missing keys: ['alphaearth']
+  - patch_1.npz: Missing keys: ['alphaearth']
+  - patch_1000.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 18090208 (representative)
+Status: PARTIALLY_VALID
+Patches: 2386
+DEM Elevation: 1488.6 to 1713.7m
+AlphaEarth Channels: 64
+Water Coverage: 1.4%
+Issues found:
+  - patch_0.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 15030104 (representative)
+Status: PARTIALLY_VALID
+Patches: 1749
+DEM Elevation: 410.7 to 457.2m
+AlphaEarth Channels: 64
+Water Coverage: 14.9%
+Issues found:
+  - patch_0.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_1.npz: Missing keys: ['alphaearth']
+  - patch_100.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 04050001 (representative)
+Status: PARTIALLY_VALID
+Patches: 2433
+DEM Elevation: 209.4 to 238.0m
+AlphaEarth Channels: 64
+Water Coverage: 3.1%
+Issues found:
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 12060201 (representative)
+Status: PARTIALLY_VALID
+Patches: 1587
+DEM Elevation: 256.5 to 301.0m
+AlphaEarth Channels: 64
+Water Coverage: 7.4%
+Issues found:
+  - patch_0.npz: Missing keys: ['alphaearth']
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_100.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['alphaearth']
+
+----------------------------------------
+
+HUC: 19020103 (representative)
+Status: PARTIALLY_VALID
+Patches: 3927
+DEM Elevation: 823.2 to 1185.0m
+AlphaEarth Channels: 64
+Water Coverage: 78.9%
+Issues found:
+  - patch_0.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_100.npz: Missing keys: ['alphaearth']
+  - patch_1000.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 02080201 (minimal)
+Status: PARTIALLY_VALID
+Patches: 1145
+DEM Elevation: 629.7 to 929.4m
+AlphaEarth Channels: 64
+Water Coverage: 4.0%
+Issues found:
+  - patch_0.npz: Missing keys: ['alphaearth']
+  - patch_1.npz: Missing keys: ['alphaearth']
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_1000.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+
+HUC: 22010000 (minimal)
+Status: PARTIALLY_VALID
+Patches: 257
+DEM Elevation: 0.0 to 75.8m
+AlphaEarth Channels: 64
+Water Coverage: 0.4%
+Issues found:
+  - patch_10.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+  - patch_101.npz: Missing keys: ['dem', 'alphaearth', 'hydro_mask', 'flow_dir']
+  - patch_103.npz: Missing keys: ['alphaearth']
+
+----------------------------------------
+
+HUC: 08050002 (minimal)
+Status: PARTIALLY_VALID
+Patches: 518
+DEM Elevation: 35.0 to 43.8m
+AlphaEarth Channels: 64
+Water Coverage: 3.2%
+Issues found:
+  - patch_1.npz: Missing keys: ['dem', 'hydro_mask', 'flow_dir']
+
+----------------------------------------
+

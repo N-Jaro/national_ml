@@ -1,0 +1,35 @@
+# DEM Sanity Analysis - Representative HUC Subset
+# Strategic sample for proving topographic signal contribution
+# Covers different geographic regions and climate zones
+# Total: 10 HUCs (sufficient for statistical significance)
+# Runtime: ~30-45 minutes vs 2-4 hours for full set
+
+# Eastern US - Humid continental
+01030003
+
+# Southeastern US - Humid subtropical  
+02080201
+
+# Great Plains - Semi-arid
+08050002
+
+# Western Mountains - Alpine/montane
+14080106
+
+# Pacific Northwest - Oceanic
+17020006
+
+# California - Mediterranean
+18090208
+
+# Southwest - Arid desert
+15030104
+
+# Great Lakes - Continental
+04050001
+
+# Texas - Subtropical
+12060201
+
+# Alaska - Subarctic
+19020103

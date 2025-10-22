@@ -1,0 +1,9 @@
+# DEM Sanity Analysis - Minimal Test Set
+# Ultra-fast validation for development and proof-of-concept
+# Total: 3 HUCs (same as test_huc_small.txt)
+# Runtime: ~10-15 minutes
+# Use for: Initial testing, debugging, quick validation
+
+02080201
+22010000
+08050002
